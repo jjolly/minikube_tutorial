@@ -206,6 +206,19 @@ kubectl get pods -o wide
 kubectl describe pod echo-pod
 ```
 
+What you should observe:
+
+- `kubectl apply` should report `pod/echo-pod created` the first time
+- `kubectl get pods -o wide` should eventually show `echo-pod` in `Running`
+- the pod should be scheduled onto your minikube node
+
+Example shape of output:
+
+```text
+NAME       READY   STATUS    RESTARTS   AGE   IP           NODE
+echo-pod   1/1     Running   0          23s   10.244.0.6   minikube
+```
+
 ---
 
 ## 4. Services
@@ -240,6 +253,20 @@ kubectl port-forward service/echo-service 8080:80
 curl http://127.0.0.1:8080
 ```
 
+What you should observe:
+
+- the Service should be created immediately
+- `kubectl port-forward` should hold the terminal open while forwarding traffic
+- the `curl` request should return the text served by the container through the Service
+
+Expected response:
+
+```text
+hello from echo-pod
+```
+
+This is an important moment in the tutorial: you are no longer talking to the Pod directly. You are talking to a stable Service endpoint that selects the Pod.
+
 ---
 
 ## 5. Kubernetes networking
@@ -257,6 +284,18 @@ Test from a temporary shell pod:
 kubectl run netshoot --image=nicolaka/netshoot:latest -it --rm -- sh
 nslookup echo-service
 curl http://echo-service
+```
+
+What you should observe:
+
+- `nslookup echo-service` should resolve the Service name using cluster DNS
+- `curl http://echo-service` should return the same echo text as before
+- this demonstrates that Pods inside the cluster can reach Services by DNS name instead of hard-coded IP addresses
+
+Expected response from `curl`:
+
+```text
+hello from echo-pod
 ```
 
 ---
@@ -354,6 +393,29 @@ kubectl delete pod -n tutorial echo-pod --ignore-not-found
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
 kubectl scale deployment/echo-deployment -n tutorial --replicas=3
 ```
+
+What you should observe:
+
+- the old standalone Pod is removed
+- the Deployment creates replacement Pods under ReplicaSet control
+- after scaling, you should see three running replicas
+
+A useful verification command is:
+
+```bash
+kubectl get pods -n tutorial -o wide
+```
+
+Example shape of output after scaling:
+
+```text
+NAME                               READY   STATUS    RESTARTS   AGE
+echo-deployment-...                1/1     Running   0          ...
+echo-deployment-...                1/1     Running   0          ...
+echo-deployment-...                1/1     Running   0          ...
+```
+
+This is the point where Kubernetes starts managing a desired replica count for you instead of just running a single unmanaged Pod.
 
 ---
 
@@ -551,6 +613,30 @@ In another terminal, request the page directly:
 curl http://127.0.0.1:8080
 ```
 
+What you should observe:
+
+- the Deployment and Service should be created
+- the forwarded request should return HTML from nginx
+- the page content should match the HTML stored in the ConfigMap
+
+Expected response:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Minikube Tutorial - Static Site</title>
+  </head>
+  <body>
+    <h1>nginx is serving this page from Kubernetes</h1>
+    <p>This page comes from a ConfigMap-mounted file.</p>
+  </body>
+</html>
+```
+
+This is your first example of Kubernetes injecting file content into a container at runtime.
+
 ---
 
 ## 15. Basic Flask `/genkey` service behind nginx
@@ -576,6 +662,21 @@ Deploy it:
 kubectl apply -f config/03-genkey-basic/genkey-basic.yaml
 kubectl port-forward -n tutorial service/genkey-basic-proxy 8081:80
 curl http://127.0.0.1:8081/genkey
+```
+
+What you should observe:
+
+- both the API Deployment and nginx proxy Deployment should become available
+- the response should be JSON rather than plain text or HTML
+- the JSON should contain generated SSH key material
+
+Expected response shape:
+
+```json
+{
+  "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----...",
+  "publicKey": "ssh-ed25519 AAAA..."
+}
 ```
 
 This stage matters because it shows:
@@ -628,6 +729,41 @@ kubectl port-forward -n tutorial service/genkey-web 8082:80
 Open:
 
 - `http://127.0.0.1:8082/genkey/`
+
+You can also verify the proxied API path through the frontend entrypoint:
+
+```bash
+curl http://127.0.0.1:8082/genkey/api
+```
+
+What you should observe:
+
+- `/genkey/` should return HTML for the frontend shell
+- `/genkey/api` should return JSON with generated key material
+- the nginx frontend image is now serving the UI and proxying API requests to the backend Service
+
+Expected response shapes:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>GenKey UI</title>
+    ...
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+```
+
+```json
+{
+  "algorithm": "ed25519",
+  "publicKey": "ssh-ed25519 AAAA...",
+  "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----..."
+}
+```
 
 At this point you have seen both patterns:
 
@@ -765,6 +901,14 @@ kubectl port-forward -n tutorial service/journal-api 8084:8080
 curl http://127.0.0.1:8084/healthz
 ```
 
+Expected healthy response:
+
+```json
+{"status":"ok","autoMigrate":true}
+```
+
+That `autoMigrate: true` value matters. It tells you that this first approach is still using API-startup schema management.
+
 In another terminal, you can then expose the web frontend:
 
 ```bash
@@ -774,6 +918,31 @@ kubectl port-forward -n tutorial service/journal-web 8083:80
 Open:
 
 - `http://127.0.0.1:8083/journal/`
+
+You can also confirm that the API can now write and read data:
+
+```bash
+curl -X POST http://127.0.0.1:8084/api/entries   -H 'Content-Type: application/json'   -d '{"title":"first entry","body":"created during startup-init verification"}'
+
+curl http://127.0.0.1:8084/api/entries
+```
+
+Expected response shape:
+
+```json
+{"id":1}
+```
+
+```json
+[
+  {
+    "id": 1,
+    "title": "first entry",
+    "body": "created during startup-init verification",
+    "createdAt": "..."
+  }
+]
+```
 
 ### What this step is demonstrating
 
@@ -831,6 +1000,33 @@ kubectl apply -f config/05-journal/step2-job-init/
 kubectl get pods,jobs -n tutorial
 kubectl logs -n tutorial job/journal-db-init
 kubectl port-forward -n tutorial service/journal-web 8084:80
+```
+
+What you should observe:
+
+- the SQL Server Deployment should become available
+- the `journal-db-init` Job should move to `Complete`
+- the API should start with `autoMigrate` disabled because schema management has been separated out
+
+A useful direct health check is:
+
+```bash
+kubectl port-forward -n tutorial service/journal-api 8085:8080
+curl http://127.0.0.1:8085/healthz
+```
+
+Expected healthy response:
+
+```json
+{"status":"ok","autoMigrate":false}
+```
+
+You can also verify end-to-end CRUD behavior:
+
+```bash
+curl -X POST http://127.0.0.1:8085/api/entries   -H 'Content-Type: application/json'   -d '{"title":"job init entry","body":"created during job-init verification"}'
+
+curl http://127.0.0.1:8085/api/entries
 ```
 
 Open:
@@ -941,6 +1137,13 @@ kubectl apply -f config/05-journal/13-ingress.yaml
 kubectl get ingress -n tutorial
 ```
 
+Expected `kubectl get ingress` shape:
+
+```text
+NAME               CLASS   HOSTS            ADDRESS   PORTS   AGE
+tutorial-ingress   nginx   tutorial.local             80      ...
+```
+
 ### Important note about testing Ingress on minikube
 
 The Ingress resource describes routing rules, but the exact way you reach the ingress controller depends on how minikube exposes it in your environment.
@@ -963,6 +1166,14 @@ curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
 ```
+
+Expected response shapes:
+
+- `/genkey/` returns the frontend HTML shell with `<title>GenKey UI</title>`
+- `/genkey/api` returns JSON with `algorithm`, `publicKey`, and `privateKey`
+- `/journal/` returns the journal frontend HTML shell with `<title>Journal App</title>`
+
+This is the final proof that a single ingress entrypoint can route to multiple backend Services by path.
 
 ### What can go wrong
 
