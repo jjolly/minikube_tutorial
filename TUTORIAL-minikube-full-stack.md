@@ -43,12 +43,13 @@ The tutorial introduces these Kubernetes ideas in this order:
 7. kube-apiserver
 8. Nodes and kubelet
 9. etcd
-10. Secrets
-11. ConfigMaps
-12. Persistent Volumes
-13. RBAC
-14. Ingress
-15. Advanced topics: Gateway API options
+10. metrics-server and `kubectl top`
+11. Secrets
+12. ConfigMaps
+13. Persistent Volumes
+14. RBAC
+15. Ingress
+16. Advanced topics: Gateway API options
 
 ---
 
@@ -229,9 +230,9 @@ If `kubectl` later appears to be talking to an old or stale minikube endpoint, f
 minikube update-context
 ```
 
-### 1.9 Enable ingress
+### 1.9 Enable ingress and metrics collection
 
-Ingress is the primary HTTP exposure path used in the main tutorial.
+The tutorial uses two minikube addons early:
 
 ```bash
 minikube addons enable ingress
@@ -241,7 +242,7 @@ minikube addons enable metrics-server
 Why these addons are enabled:
 
 - **ingress** provides the nginx ingress controller used later in the tutorial
-- **metrics-server** is not strictly required for every step, but it is a common supporting addon in minikube environments and useful to have available while learning
+- **metrics-server** provides resource-usage data for commands such as `kubectl top`, which we will use later to inspect node and Pod CPU/memory usage
 
 ---
 
@@ -627,7 +628,86 @@ Look for an `etcd-*` pod in the control plane.
 
 ---
 
-## 12. Secrets
+## 12. metrics-server and `kubectl top`
+
+Earlier, the tutorial enabled the `metrics-server` addon. This is where it becomes useful.
+
+The metrics-server collects resource-usage data from the cluster and makes it available through the Kubernetes metrics APIs. The most common way you will notice it is through the `kubectl top` commands.
+
+Small mental model:
+
+```text
+node / kubelet metrics
+        |
+        v
+   metrics-server
+        |
+        v
+    Kubernetes metrics API
+        |
+        v
+     kubectl top
+```
+
+Why this matters in this tutorial:
+
+- it gives you a way to inspect actual CPU and memory usage
+- it helps make `requests` and `limits` feel concrete instead of decorative
+- it gives you another way to understand what your cluster is doing while workloads are running
+
+### Verify that metrics-server is working
+
+```bash
+kubectl get pods -n kube-system
+kubectl top nodes
+kubectl top pods -n tutorial
+```
+
+What you should observe:
+
+- `kubectl top nodes` should show CPU and memory usage for the minikube node
+- `kubectl top pods -n tutorial` should show resource usage for Pods in your tutorial namespace once you have workloads running there
+
+Example shape of output:
+
+```text
+NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+minikube   429m         10%    1903Mi          24%
+```
+
+```text
+NAME                                 CPU(cores)   MEMORY(bytes)
+static-nginx-...                     1m           6Mi
+genkey-api-...                       2m           28Mi
+journal-api-...                      5m           74Mi
+journal-db-...                       98m          834Mi
+```
+
+### How to interpret what you are seeing
+
+A few practical observations:
+
+- a tiny nginx Pod will usually show very low CPU and memory usage
+- the journal database typically uses much more memory than the simple frontend examples
+- the numbers you see here are **current usage**, not the same thing as requested or limited resources in YAML
+
+That distinction matters:
+
+- **requests** tell Kubernetes what resources a Pod expects to need for scheduling
+- **limits** tell Kubernetes the upper bound it may use before throttling or enforcement
+- `kubectl top` shows what the workload is actually using right now
+
+Those three ideas are related, but they are not interchangeable.
+
+### Troubleshooting
+
+- if `kubectl top` says metrics are not available yet, wait a minute and try again
+- if you do not see tutorial Pods in `kubectl top pods -n tutorial`, make sure you have actually deployed workloads in the `tutorial` namespace first
+- if the addon seems unhealthy, inspect `kube-system` Pods and look for a metrics-server Pod that is still starting or failing
+
+---
+
+## 13. Secrets
 
 A **Secret** stores sensitive values such as passwords, tokens, and connection strings.
 
