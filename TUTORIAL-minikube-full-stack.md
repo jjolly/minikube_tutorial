@@ -71,12 +71,12 @@ Before installing anything, inspect the environment.
 ```bash
 uname -a
 cat /etc/os-release
-which docker || true
-which kubectl || true
-which minikube || true
-docker --version || true
-kubectl version --client || true
-minikube version || true
+which docker
+which kubectl
+which minikube
+docker --version
+kubectl version --client
+minikube version
 ```
 
 What this tells you:
@@ -86,7 +86,9 @@ What this tells you:
 - `which ...` checks whether a command is already on your `PATH`
 - the `--version` commands confirm whether the installed tools actually run
 
-If a command is missing, that is fine. That is exactly what this section is here to fix.
+In a normal interactive shell, some of these commands may fail if the tool is not installed yet. That is fine. For example, you might see messages such as `docker: command not found` or no output from `which docker`.
+
+That is not a problem. At this stage, you are only checking what is already present before installing anything.
 
 ### 1.2 Why this tutorial uses Docker as the minikube driver
 
