@@ -246,7 +246,7 @@ Why these addons are enabled:
 
 ---
 
-## 2. Repository layout
+## 2. Tutorial layout
 
 ```text
 src/
