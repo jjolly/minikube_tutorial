@@ -114,6 +114,10 @@ kubectl get nodes
 kubectl cluster-info
 ```
 
+### Note for later refinement: container runtimes and driver choice
+
+During the polish phase, this tutorial should add a short comparison of the common container-runtime and driver choices available in a local minikube workflow, and explain why Docker was chosen here. The short version is that Docker is being used in this tutorial because it is common, familiar, and usually the least surprising path for a WSL-based learning environment.
+
 ### 1.6 Enable ingress
 
 Ingress is the primary HTTP exposure path used in the main tutorial.
@@ -305,7 +309,7 @@ A **stateless application** is one where an individual application instance does
 Examples of stateless applications:
 
 - nginx serving static files from an image or ConfigMap
-- a Flask API that stores durable data in SQL Server
+- a C# API that stores durable data in SQL Server
 
 A stateful application, by contrast, keeps important durable state locally or depends on stable identity. SQL Server storing database files is the clearest stateful example in this tutorial.
 
@@ -539,6 +543,12 @@ Pay attention to these fields:
 ```bash
 kubectl apply -f config/02-static-nginx/static-site.yaml
 kubectl port-forward -n tutorial service/static-nginx 8080:80
+```
+
+In another terminal, request the page directly:
+
+```bash
+curl http://127.0.0.1:8080
 ```
 
 ---
