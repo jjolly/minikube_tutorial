@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: journal-api
+  namespace: tutorial
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: journal-api
+  template:
+    metadata:
+      labels:
+        app: journal-api
+        tier: api
+    spec:
+      containers:
+        - name: api
+          image: journal-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ConnectionStrings__JournalDb
+              valueFrom:
+                secretKeyRef:
+                  name: journal-startup-init-secret
+                  key: JOURNALDB_ADMIN_CONNECTION_STRING
+            - name: Journal__AutoMigrate
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi

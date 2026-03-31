@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: journal-db-init-sql
+  namespace: tutorial
+data:
+  init.sql.tmpl: |
+    IF DB_ID(N'JournalDb') IS NULL
+    BEGIN
+        CREATE DATABASE JournalDb;
+    END;
+    GO
+
+    USE JournalDb;
+    GO
+
+    IF OBJECT_ID(N'dbo.Entries', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.Entries (
+            Id INT IDENTITY(1,1) PRIMARY KEY,
+            Title NVARCHAR(200) NOT NULL,
+            Body NVARCHAR(MAX) NOT NULL,
+            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+        );
+    END;
+    GO
+
+    IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'journal_app')
+    BEGIN
+        CREATE LOGIN journal_app WITH PASSWORD = '__APP_PASSWORD__';
+    END;
+    GO
+
+    IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'journal_app')
+    BEGIN
+        CREATE USER journal_app FOR LOGIN journal_app;
+    END;
+    GO
+
+    GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.Entries TO journal_app;
+    GO

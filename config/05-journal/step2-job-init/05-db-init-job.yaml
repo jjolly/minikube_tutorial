@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: journal-db-init
+  namespace: tutorial
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: journal-db-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: sqlcmd
+          image: mcr.microsoft.com/mssql-tools
+          env:
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: journal-job-init-secret
+                  key: SA_PASSWORD
+            - name: JOURNALDB_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: journal-job-init-secret
+                  key: JOURNALDB_APP_PASSWORD
+          command:
+            - /bin/bash
+            - -lc
+            - |
+              set -euo pipefail
+              echo "Waiting for SQL Server to accept connections..."
+              for i in $(seq 1 60); do
+                if /opt/mssql-tools/bin/sqlcmd -S journal-db -U sa -P "$SA_PASSWORD" -Q "SELECT 1" >/dev/null 2>&1; then
+                  echo "SQL Server is ready. Rendering init script from Secret-backed values..."
+                  sed "s/__APP_PASSWORD__/${JOURNALDB_APP_PASSWORD}/g" /sql/init.sql.tmpl > /tmp/init.sql
+                  echo "Applying JournalDb schema and app user..."
+                  /opt/mssql-tools/bin/sqlcmd -S journal-db -U sa -P "$SA_PASSWORD" -i /tmp/init.sql
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo "Timed out waiting for SQL Server" >&2
+              exit 1
+          volumeMounts:
+            - name: init-sql
+              mountPath: /sql
+      volumes:
+        - name: init-sql
+          configMap:
+            name: journal-db-init-sql

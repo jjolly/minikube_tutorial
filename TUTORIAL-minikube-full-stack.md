@@ -1,74 +1,69 @@
-# Minikube Tutorial: From Single Pods to a Reverse-Proxy Front End and a Stateful Journal App
+# Minikube Tutorial: From First Pods to a Reverse-Proxy Stack and Stateful Journal App
 
-This is a progressive, hands-on tutorial for running Kubernetes locally with **minikube** inside **WSL Linux**. It is written to be general enough for **Ubuntu** and **openSUSE Leap** users running in WSL, and it starts from installation and ends with a realistic multi-service stack:
+This tutorial is a progressive guide to learning Kubernetes on **minikube** running inside **WSL Linux**. It is aimed at a setup that should be general enough for **Ubuntu** and **openSUSE Leap** inside WSL.
 
-- a simple pod
-- a static site served by nginx
-- a Python `/genkey` service behind nginx
-- a more complete React + Flask application under `/genkey` and `/genkey/api`
-- a C# journal application backed by **Microsoft SQL Server** with **persistent storage**
+The tutorial deliberately teaches by contrast in a few places:
 
-Along the way, the tutorial introduces Kubernetes concepts in this order:
+- first a simple, workable approach
+- then a stronger, more production-like approach
+- then an explanation of why the second approach is better
 
-1. Pods
-2. Services
-3. Kubernetes networking
-4. Namespaces
-5. Labels
-6. Deployments
-7. The kube-apiserver
-8. Nodes and kubelet
-9. etcd
-10. ConfigMaps
-11. Secrets
-12. Persistent Volumes
-13. Ingress and the Gateway API
-14. RBAC
+That teaching pattern appears in two especially important places:
 
-Everything is stored in this repository so you can inspect and refine it:
+1. **frontend assets**
+   - first: ConfigMap-mounted static files
+   - later: packaged frontend image
+2. **database initialization**
+   - first: schema creation in API startup
+   - later: schema creation in a dedicated Kubernetes Job
 
-- `src/` — application source code and static assets
-- `config/` — Kubernetes manifests and related config files
+By the end, you will have:
+
+- a simple pod and service
+- a static nginx web page
+- a Flask `/genkey` service behind nginx
+- a React frontend under `/genkey` with a Flask API at `/genkey/api`
+- a C# journal application backed by Microsoft SQL Server with persistent storage
+- an Ingress route exposing both `/genkey` and `/journal`
+
+---
 
 ## 0. What you are building and why
 
-Minikube is a local Kubernetes distribution that runs a single-node cluster on your machine. In WSL, it is a practical way to learn Kubernetes without renting cloud infrastructure.
+Minikube gives you a local Kubernetes cluster you can experiment with safely. On WSL, that means you can learn the Kubernetes object model and application deployment flow without renting cloud infrastructure first.
 
-By the end of this guide you will understand how Kubernetes pieces fit together:
+The tutorial introduces these Kubernetes ideas in this order:
 
-- **Pods** run containers.
-- **Services** provide stable network identities.
-- **Namespaces** separate environments and concerns.
-- **Labels** let Kubernetes group and select objects.
-- **Deployments** manage rollout and self-healing for stateless workloads.
-- **ConfigMaps** and **Secrets** externalize configuration.
-- **Persistent Volumes** keep data alive beyond a pod restart.
-- **Ingress** and **Gateway API** expose HTTP routes cleanly.
-- **RBAC** controls what identities can do.
+1. Pods
+2. Services
+3. Networking
+4. Namespaces
+5. Labels
+6. Deployments
+7. kube-apiserver
+8. Nodes and kubelet
+9. etcd
+10. Secrets
+11. ConfigMaps
+12. Persistent Volumes
+13. RBAC
+14. Ingress
+15. Advanced topics: Gateway API options
 
-You will also touch the control plane pieces that make Kubernetes work:
-
-- **kube-apiserver** — the front door to the cluster
-- **etcd** — the cluster database
-- **kubelet** — the agent running on each node
-- **node** — the machine hosting workloads
+---
 
 ## 1. Prerequisites
 
-You already have minikube working, which is excellent. For completeness, this section documents a clean install path on WSL.
+You already have minikube running, which is a good starting point. This section documents a general install path so the tutorial is self-contained.
 
-### Why WSL-specific guidance matters
-
-Minikube can use different drivers and runtimes. In WSL, the easiest path is usually Docker or Podman if they are already available in your WSL instance. The exact package names differ between Ubuntu and openSUSE Leap, but the Kubernetes workflow is the same.
-
-### 1.1 Install required tools on Ubuntu
+### 1.1 Ubuntu packages
 
 ```bash
 sudo apt update
 sudo apt install -y curl wget tar conntrack socat git ca-certificates
 ```
 
-If you plan to use Docker as the minikube driver:
+If using Docker as the minikube driver:
 
 ```bash
 sudo apt install -y docker.io
@@ -76,14 +71,14 @@ sudo usermod -aG docker "$USER"
 newgrp docker
 ```
 
-### 1.2 Install required tools on openSUSE Leap
+### 1.2 openSUSE Leap packages
 
 ```bash
 sudo zypper refresh
 sudo zypper install -y curl wget tar conntrack-tools socat git ca-certificates
 ```
 
-If you plan to use Docker:
+If using Docker:
 
 ```bash
 sudo zypper install -y docker
@@ -94,7 +89,7 @@ newgrp docker
 
 ### 1.3 Install kubectl
 
-Why: `kubectl` is the main command-line client for talking to the Kubernetes API server.
+`kubectl` is the command-line client for the Kubernetes API server.
 
 ```bash
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -105,15 +100,13 @@ kubectl version --client
 
 ### 1.4 Install minikube
 
-Why: minikube creates and manages a local Kubernetes cluster.
-
 ```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
 minikube version
 ```
 
-### 1.5 Start minikube
+### 1.5 Start and verify the cluster
 
 ```bash
 minikube start --driver=docker
@@ -121,12 +114,16 @@ kubectl get nodes
 kubectl cluster-info
 ```
 
-### 1.6 Enable useful add-ons
+### 1.6 Enable ingress
+
+Ingress is the primary HTTP exposure path used in the main tutorial.
 
 ```bash
 minikube addons enable ingress
 minikube addons enable metrics-server
 ```
+
+---
 
 ## 2. Repository layout
 
@@ -142,11 +139,19 @@ config/
   03-genkey-basic/
   04-genkey-full/
   05-journal/
+  advanced/
 ```
+
+- `src/` contains application source code and Docker build inputs.
+- `config/` contains Kubernetes manifests.
+- `config/05-journal/step1-startup-init/` contains the first database-init approach.
+- `config/05-journal/step2-job-init/` contains the improved database-init approach.
+
+---
 
 ## 3. Pods
 
-A **pod** is the smallest deployable unit in Kubernetes. Usually one application container runs in one pod.
+A **pod** is the smallest deployable unit in Kubernetes. A pod usually runs one application container, though it can run more than one when the containers are meant to cooperate tightly.
 
 ### 3.1 Run a short-lived BusyBox pod
 
@@ -178,6 +183,17 @@ spec:
         - containerPort: 5678
 ```
 
+What the fields are for:
+
+- `apiVersion: v1` — says this object uses the core v1 Kubernetes API.
+- `kind: Pod` — declares the object type.
+- `metadata.name` — gives the object its cluster-local name.
+- `metadata.labels` — attaches identifying key/value metadata for selection and grouping.
+- `spec.containers` — lists containers that should run inside the pod.
+- `image` — container image to launch.
+- `args` — command arguments passed to the container entrypoint.
+- `containerPort` — documents the port the container listens on.
+
 Apply it:
 
 ```bash
@@ -186,9 +202,11 @@ kubectl get pods -o wide
 kubectl describe pod echo-pod
 ```
 
+---
+
 ## 4. Services
 
-Pods are ephemeral. A **Service** gives a stable virtual IP and DNS name for reaching a group of pods.
+Pods are ephemeral. A pod can be recreated and receive a different IP address. A **Service** gives a stable virtual IP and DNS name that can target one or more matching pods.
 
 File: `config/01-pods/service-echo.yaml`
 
@@ -205,20 +223,31 @@ spec:
       targetPort: 5678
 ```
 
+What the fields are for:
+
+- `kind: Service` — declares a stable network endpoint.
+- `selector` — chooses pods with matching labels.
+- `port` — port exposed by the Service.
+- `targetPort` — port on the selected pods.
+
 ```bash
 kubectl apply -f config/01-pods/service-echo.yaml
 kubectl port-forward service/echo-service 8080:80
 curl http://127.0.0.1:8080
 ```
 
+---
+
 ## 5. Kubernetes networking
 
-Networking basics:
+Kubernetes networking is built around a few expectations:
 
 - every pod gets an IP
-- pods can reach other pods directly
-- Services provide stable addresses
-- DNS is built in
+- pods can usually talk directly to other pods
+- Services provide stable names and virtual IPs
+- cluster DNS resolves Service names automatically
+
+Test from a temporary shell pod:
 
 ```bash
 kubectl run netshoot --image=nicolaka/netshoot:latest -it --rm -- sh
@@ -226,7 +255,11 @@ nslookup echo-service
 curl http://echo-service
 ```
 
+---
+
 ## 6. Namespaces
+
+A **namespace** groups resources so you can separate environments and reduce clutter.
 
 File: `config/01-pods/namespace-tutorial.yaml`
 
@@ -244,18 +277,37 @@ kubectl apply -n tutorial -f config/01-pods/service-echo.yaml
 kubectl get all -n tutorial
 ```
 
+---
+
 ## 7. Labels
 
-Labels are key/value pairs used for selection and organization.
+**Labels** are key/value pairs attached to objects. Kubernetes uses them heavily for selection.
+
+Examples:
+
+- a Service uses labels to decide which pods are backends
+- a Deployment uses labels to identify the pods it manages
+- operators use labels to filter resources
 
 ```bash
 kubectl get pods -n tutorial --show-labels
 kubectl get pods -n tutorial -l app=echo
 ```
 
+---
+
 ## 8. Deployments
 
-A **Deployment** manages stateless application rollout.
+A **Deployment** manages rollout for a stateless application.
+
+A **stateless application** is one where an individual application instance does not hold the only copy of important long-term data inside its own process or filesystem. If the container restarts, another identical instance can usually take over.
+
+Examples of stateless applications:
+
+- nginx serving static files from an image or ConfigMap
+- a Flask API that stores durable data in SQL Server
+
+A stateful application, by contrast, keeps important durable state locally or depends on stable identity. SQL Server storing database files is the clearest stateful example in this tutorial.
 
 File: `config/01-pods/deployment-echo.yaml`
 
@@ -287,15 +339,23 @@ spec:
             - containerPort: 5678
 ```
 
+What the important fields do:
+
+- `replicas` — desired number of pod copies.
+- `selector.matchLabels` — tells the Deployment which pods belong to it.
+- `template` — pod template used for each replica.
+
 ```bash
 kubectl delete pod -n tutorial echo-pod --ignore-not-found
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
 kubectl scale deployment/echo-deployment -n tutorial --replicas=3
 ```
 
+---
+
 ## 9. kube-apiserver
 
-The **kube-apiserver** is the cluster front door. `kubectl` talks to it.
+The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
 
 ```bash
 kubectl api-resources | head -40
@@ -305,9 +365,11 @@ kubectl cluster-info
 kubectl get deployment echo-deployment -n tutorial -o yaml
 ```
 
+---
+
 ## 10. Nodes and kubelet
 
-A **node** is a worker machine. The **kubelet** is the agent on that node.
+A **node** is a machine that runs workloads. In minikube, you typically have one node. The **kubelet** is the agent on that node that makes sure the assigned containers actually run.
 
 ```bash
 kubectl get nodes -o wide
@@ -315,9 +377,11 @@ kubectl describe node minikube
 kubectl get pods -n kube-system -o wide
 ```
 
+---
+
 ## 11. etcd
 
-**etcd** is the backing data store for Kubernetes state.
+**etcd** is the key-value store that holds cluster state. When you create a namespace, secret, deployment, or service, the desired state is stored through the API server and backed by etcd.
 
 ```bash
 kubectl get pods -n kube-system
@@ -325,30 +389,81 @@ kubectl get pods -n kube-system
 
 Look for an `etcd-*` pod in the control plane.
 
-## 12. Static web page with nginx
+---
 
-File: `src/02-nginx-static/index.html`
+## 12. Secrets
 
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Minikube Tutorial - Static Site</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      body { font-family: sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }
-      main { max-width: 48rem; margin: 0 auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>nginx is serving this page from Kubernetes</h1>
-      <p>This static site is mounted from a ConfigMap in the tutorial namespace.</p>
-    </main>
-  </body>
-</html>
+A **Secret** stores sensitive values such as passwords, tokens, and connection strings.
+
+Conceptually, this section fits well after etcd because Secrets are Kubernetes objects too. They are stored as part of cluster state, even though they are handled separately from ordinary configuration data.
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-secret
+  namespace: tutorial
+type: Opaque
+stringData:
+  username: demo
+  password: super-secret-value
 ```
+
+Field intent:
+
+- `type: Opaque` — generic Secret type.
+- `stringData` — convenient plaintext input that Kubernetes converts into the stored Secret form.
+
+We will use Secrets for SQL Server credentials later in the tutorial.
+
+---
+
+## 13. ConfigMaps
+
+A **ConfigMap** stores non-secret configuration data.
+
+Typical ConfigMap use cases:
+
+- small application config files
+- environment-specific settings
+- small static content for simple demonstrations
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+  namespace: tutorial
+data:
+  app-mode: tutorial
+  index.html: |
+    <h1>Hello from a ConfigMap</h1>
+```
+
+Field intent:
+
+- `data` — key/value content stored in the ConfigMap.
+- multiline entries under `data` are useful when storing small files.
+
+We will first use ConfigMaps for a static web page because they are very easy to inspect and teach. Later we will contrast that with building frontend assets into an image.
+
+---
+
+## 14. Static nginx web page using a ConfigMap
+
+This is the first frontend pattern in the tutorial.
+
+**Why use a ConfigMap here?**
+
+Because it is a great teaching tool:
+
+- you can see the HTML directly in YAML
+- you can mount the content into nginx without building an image
+- it shows how Kubernetes can inject files into a container at runtime
 
 File: `config/02-static-nginx/static-site.yaml`
 
@@ -415,27 +530,29 @@ spec:
       targetPort: 80
 ```
 
+Pay attention to these fields:
+
+- `ConfigMap.data.index.html` — stores the page content.
+- `volumes.configMap.name` — connects the pod to the ConfigMap.
+- `volumeMounts.subPath` — mounts just one file from the ConfigMap to the nginx document root.
+
 ```bash
 kubectl apply -f config/02-static-nginx/static-site.yaml
 kubectl port-forward -n tutorial service/static-nginx 8080:80
 ```
 
-## 13. ConfigMaps
+---
 
-A **ConfigMap** stores non-secret configuration. The static site above is your first example.
+## 15. Basic Flask `/genkey` service behind nginx
 
-```bash
-kubectl get configmap static-site-content -n tutorial -o yaml
-```
-
-## 14. Simple Python `/genkey` service behind nginx
+This stage introduces a reverse proxy and service-to-service routing.
 
 Architecture:
 
 - `genkey-basic-api` — Flask app serving `/genkey`
 - `genkey-basic-proxy` — nginx reverse proxy
 
-Build the image into minikube:
+Build the API image into minikube:
 
 ```bash
 cd src/03-genkey-basic
@@ -443,7 +560,7 @@ minikube image build -t genkey-basic-api:0.1.0 .
 cd ../..
 ```
 
-Apply:
+Deploy it:
 
 ```bash
 kubectl apply -f config/03-genkey-basic/genkey-basic.yaml
@@ -451,31 +568,37 @@ kubectl port-forward -n tutorial service/genkey-basic-proxy 8081:80
 curl http://127.0.0.1:8081/genkey
 ```
 
-## 15. Secrets
+This stage matters because it shows:
 
-A **Secret** stores sensitive configuration such as passwords.
+- Service-to-Service communication by DNS name
+- nginx acting as a reverse proxy inside the cluster
+- container image build and local deployment
 
-For the runnable journal stack, the Secret now stores both the SQL Server SA password and the application connection string so the API deployment does not hard-code credentials in its manifest.
+---
 
-Example:
+## 16. Richer frontend: built image instead of ConfigMap assets
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mssql-secret
-  namespace: tutorial
-type: Opaque
-stringData:
-  SA_PASSWORD: "YourStrong!Passw0rd"
-  JOURNALDB_CONNECTION_STRING: "Server=journal-db,1433;Database=JournalDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;Encrypt=False"
-```
+Now we revisit frontend delivery with a better packaging model.
 
-## 16. More complete app: React front end + Flask API under nginx
+Earlier, the ConfigMap-mounted static site was useful because it taught ConfigMaps clearly. But for a richer frontend application, packaging the frontend into an image is a better pattern.
 
-This version serves a real React front end under `/genkey` and proxies `/genkey/api` to Flask. Unlike the earlier ConfigMap-based static examples, this stage now packages the React app into its own local image so the deployed workload matches the source tree.
+### Why a built image is better here
 
-Build the front end image and backend image directly into minikube:
+**ConfigMap-mounted assets**
+- simple for tiny examples
+- easy to inspect
+- good for teaching ConfigMaps
+- awkward for larger frontends
+- not a normal packaging strategy for serious UI deployments
+
+**Built frontend image**
+- versioned artifact
+- cleaner deployment manifests
+- source tree matches what actually runs
+- better reproducibility
+- more realistic operational model
+
+### Build the React frontend image and Flask backend image
 
 ```bash
 cd src/04-genkey-full/backend
@@ -485,20 +608,33 @@ minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
 cd ../..
 ```
 
-Apply:
+Apply the image-based manifests:
 
 ```bash
-kubectl apply -f config/04-genkey-full/genkey-full.yaml
+kubectl apply -f config/04-genkey-full/image-based/
 kubectl port-forward -n tutorial service/genkey-web 8082:80
 ```
 
-Open `http://127.0.0.1:8082/genkey/`.
+Open:
+
+- `http://127.0.0.1:8082/genkey/`
+
+At this point you have seen both patterns:
+
+1. ConfigMap-mounted static files
+2. built frontend image
+
+The tutorial uses both on purpose so the reader understands the difference.
+
+---
 
 ## 17. Persistent Volumes
 
-A **PersistentVolumeClaim** lets state survive pod restarts.
+A **PersistentVolumeClaim** requests durable storage for a workload.
 
-File: `config/05-journal/storage.yaml`
+We need this for SQL Server because the journal database is stateful and should survive pod restarts.
+
+Example file: `config/05-journal/step1-startup-init/01-pvc.yaml`
 
 ```yaml
 apiVersion: v1
@@ -514,15 +650,37 @@ spec:
       storage: 8Gi
 ```
 
-## 18. C# journal application step by step
+Field intent:
 
-Architecture:
+- `accessModes` — how the volume may be mounted.
+- `resources.requests.storage` — requested storage size.
 
-- `journal-web` — frontend served by nginx
-- `journal-api` — ASP.NET Core API
-- `journal-db` — SQL Server using a PVC
+---
 
-Build the API image:
+## 18. Journal application, first approach: schema init inside API startup
+
+This first journal deployment uses the simplest developer-friendly pattern:
+
+- SQL Server runs in the cluster
+- the API starts with elevated DB privileges
+- the API checks and creates the schema at startup
+- the web frontend talks to the API through nginx
+
+This is a very real pattern in small systems, and it is worth seeing first.
+
+### Why show this approach first?
+
+Because it is understandable and practical:
+
+- fewer Kubernetes objects
+- the schema logic is visible in the application itself
+- easy to reason about as a first implementation
+
+### Important limitation
+
+This approach is **not optimal** because the API runtime now needs privileges that are broader than it needs for normal request handling.
+
+### Build the journal API image
 
 ```bash
 cd src/05-journal/api
@@ -530,73 +688,91 @@ minikube image build -t journal-api:0.1.0 .
 cd ../../..
 ```
 
-Apply the stack:
+### Apply the first-step manifests
 
 ```bash
-kubectl apply -f config/05-journal/journal-stack.yaml
+kubectl apply -f config/05-journal/step1-startup-init/
+kubectl get pods -n tutorial
 kubectl port-forward -n tutorial service/journal-web 8083:80
 ```
 
-Open `http://127.0.0.1:8083/journal/`.
+Open:
 
-The journal stack now includes a Kubernetes **Job** called `journal-db-init` that waits for SQL Server and then applies the schema automatically. That removes the old manual `sqlcmd` step and makes the stack much more repeatable.
+- `http://127.0.0.1:8083/journal/`
 
-After applying the manifest, check the init job and then the rest of the stack:
+### What this step is demonstrating
+
+- Secrets carrying SQL credentials
+- PVC-backed SQL Server storage
+- application-driven schema bootstrap
+- nginx serving the journal UI and proxying `/journal/api/`
+
+### Why this is not the end state
+
+Startup-based schema creation mixes deployment concerns into the API runtime:
+
+- the API needs elevated privileges
+- startup behavior becomes more complex
+- multiple replicas can complicate initialization workflows
+- database bootstrap and request serving are different operational concerns
+
+That leads directly to the improved approach in the next section.
+
+---
+
+## 19. Journal application, improved approach: dedicated database-init Job
+
+Now we split schema initialization away from the API.
+
+In this version:
+
+- SQL Server still starts with persistent storage
+- a dedicated **Job** initializes the database schema
+- the Job also creates a less-privileged application login
+- the API runs with the application login instead of elevated schema-management privileges
+
+### Why this approach is better
+
+**Startup init inside API**
+- simpler first implementation
+- fewer cluster objects
+- easier for a first pass
+- but mixes bootstrap and runtime responsibilities
+- and gives the API broader DB privileges than it should need
+
+**Dedicated Job**
+- clearer separation of concerns
+- easier to observe and debug independently
+- better security posture
+- better cluster deployment strategy
+- better teaching example for real Kubernetes workflows
+
+### Apply the improved manifests
 
 ```bash
-kubectl apply -f config/05-journal/journal-stack.yaml
+kubectl apply -f config/05-journal/step2-job-init/
 kubectl get pods,jobs -n tutorial
 kubectl logs -n tutorial job/journal-db-init
-kubectl port-forward -n tutorial service/journal-web 8083:80
+kubectl port-forward -n tutorial service/journal-web 8084:80
 ```
 
-## 19. Ingress
+Open:
 
-File: `config/05-journal/ingress.yaml`
+- `http://127.0.0.1:8084/journal/`
 
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: tutorial-ingress
-  namespace: tutorial
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: tutorial.local
-      http:
-        paths:
-          - path: /genkey
-            pathType: Prefix
-            backend:
-              service:
-                name: genkey-web
-                port:
-                  number: 80
-          - path: /journal
-            pathType: Prefix
-            backend:
-              service:
-                name: journal-web
-                port:
-                  number: 80
-```
+### What the improved step teaches
 
-## 20. Gateway API
+- Jobs as one-time cluster tasks
+- privilege separation between schema management and normal app runtime
+- a more maintainable deployment model for stateful applications
 
-For now, treat Gateway API as an **optional next step** rather than part of the base runnable path. In minikube, Ingress is the simpler route because the ingress add-on is easy to enable and test.
+---
 
-The file `config/05-journal/gateway-api.yaml` is now just a note explaining that you must first choose and install a real Gateway controller before those resources will work.
+## 20. RBAC
 
-That means the practical runnable path for this tutorial is:
+**RBAC** controls who can do what in Kubernetes.
 
-1. use `port-forward` while building each stage
-2. use **Ingress** once both apps are working
-3. add **Gateway API** only after you intentionally pick a controller
-
-## 21. RBAC
-
-File: `config/05-journal/rbac-readonly.yaml`
+Example file: `config/05-journal/12-rbac-readonly.yaml`
 
 ```yaml
 apiVersion: v1
@@ -633,38 +809,110 @@ roleRef:
   name: tutorial-readonly
 ```
 
-Test it:
-
 ```bash
-kubectl apply -f config/05-journal/rbac-readonly.yaml
+kubectl apply -f config/05-journal/12-rbac-readonly.yaml
 kubectl auth can-i list pods --as=system:serviceaccount:tutorial:tutorial-reader -n tutorial
 kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutorial-reader -n tutorial
 ```
 
-## 22. What is now runnable vs still optional
+---
 
-Runnable now:
+## 21. Ingress
 
-- namespace, pod, service, and deployment examples
-- static nginx site via ConfigMap
-- basic Flask `/genkey` API behind nginx
-- React + Flask `/genkey` app structure
-- journal stack with PVC, Secret-backed connection string, and automatic DB-init Job
-- Ingress-based HTTP entry point
+Ingress is the main HTTP exposure strategy for the core tutorial because it is minikube-friendly and easy to enable with the ingress addon.
 
-Still optional / not yet fully operational by default:
+File: `config/05-journal/13-ingress.yaml`
 
-- Gateway API, until you install a concrete controller
-- production-grade hardening such as resource limits, network policies, TLS, and non-dev database credentials
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tutorial-ingress
+  namespace: tutorial
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: tutorial.local
+      http:
+        paths:
+          - path: /genkey
+            pathType: Prefix
+            backend:
+              service:
+                name: genkey-web
+                port:
+                  number: 80
+          - path: /journal
+            pathType: Prefix
+            backend:
+              service:
+                name: journal-web
+                port:
+                  number: 80
+```
 
-## 23. Suggested next refinements
+Why this is the main path:
 
-This draft is structurally complete, but the next improvements I’d make are:
+- easy to explain
+- easy to enable in minikube
+- sufficient for the tutorial’s HTTP routing goals
 
-- split large manifest bundles into smaller files per object
-- add screenshots and expected command output
-- add health checks, resource requests, and limits everywhere
-- replace inline ConfigMap UI assets with built container images
-- move the journal DB password fully to Secrets for the API too
-- add a Job or init workflow for SQL schema setup
-- swap the placeholder GatewayClass/controller with a concrete minikube-friendly controller
+Apply it:
+
+```bash
+kubectl apply -f config/05-journal/13-ingress.yaml
+kubectl get ingress -n tutorial
+```
+
+---
+
+## 22. Advanced topics: Gateway and alternatives to Ingress
+
+The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
+
+See:
+
+- `config/advanced/gateway-options.md`
+
+Summary of options:
+
+### NGINX Gateway Fabric
+- Benefits: familiar nginx ecosystem, natural follow-on from Ingress.
+- Limitations: extra install and controller setup.
+
+### Envoy Gateway
+- Benefits: strong modern Gateway API story, good long-term relevance.
+- Limitations: heavier than the basic tutorial path.
+
+### Cilium Gateway API
+- Benefits: powerful if you also want to learn deeper networking.
+- Limitations: adds a lot of extra surface area.
+
+### Istio Gateway API support
+- Benefits: very capable traffic management.
+- Limitations: too much overhead for the core minikube tutorial.
+
+### Recommendation
+
+Keep the main tutorial on **Ingress**.
+
+If you later want one advanced Gateway-focused extension, the best first options are:
+
+1. **NGINX Gateway Fabric**
+2. **Envoy Gateway**
+
+---
+
+## 23. What is already ready for polish later
+
+This version is meant to have the right **structure** and **teaching contrasts** first.
+
+During the polish phase, the highest-value upgrades will be:
+
+- expected command output gathered from actually running the steps
+- stronger explanations after each YAML block
+- diagrams or request-flow sketches
+- better “what you should observe now” callouts
+- screenshots if desired
+- deeper explanations of each Kubernetes field where helpful
+

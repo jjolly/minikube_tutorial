@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: journal-api
+  namespace: tutorial
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: journal-api
+  template:
+    metadata:
+      labels:
+        app: journal-api
+        tier: api
+    spec:
+      initContainers:
+        - name: wait-for-schema
+          image: mcr.microsoft.com/mssql-tools
+          env:
+            - name: APP_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: journal-job-init-secret
+                  key: JOURNALDB_APP_CONNECTION_STRING
+          command:
+            - /bin/bash
+            - -lc
+            - |
+              set -euo pipefail
+              SERVER=$(echo "$APP_CONNECTION_STRING" | sed -n 's/.*Server=\([^;]*\).*/\1/p')
+              DB=$(echo "$APP_CONNECTION_STRING" | sed -n 's/.*Database=\([^;]*\).*/\1/p')
+              USER=$(echo "$APP_CONNECTION_STRING" | sed -n 's/.*User Id=\([^;]*\).*/\1/p')
+              PASS=$(echo "$APP_CONNECTION_STRING" | sed -n 's/.*Password=\([^;]*\).*/\1/p')
+              for i in $(seq 1 60); do
+                if /opt/mssql-tools/bin/sqlcmd -S "$SERVER" -U "$USER" -P "$PASS" -d "$DB" -Q "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Entries'" | grep -q 1; then
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo "Timed out waiting for journal schema" >&2
+              exit 1
+      containers:
+        - name: api
+          image: journal-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ConnectionStrings__JournalDb
+              valueFrom:
+                secretKeyRef:
+                  name: journal-job-init-secret
+                  key: JOURNALDB_APP_CONNECTION_STRING
+            - name: Journal__AutoMigrate
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
