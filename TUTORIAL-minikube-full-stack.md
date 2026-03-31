@@ -225,6 +225,13 @@ echo-pod   1/1     Running   0          23s   10.244.0.6   minikube
 
 Pods are ephemeral. A pod can be recreated and receive a different IP address. A **Service** gives a stable virtual IP and DNS name that can target one or more matching pods.
 
+This is one of the most important mental-model shifts in Kubernetes:
+
+- you usually do **not** build application communication around Pod IPs
+- you usually build it around **Services**
+
+Pods come and go. Services give other workloads a stable way to find the current healthy backend Pods.
+
 File: `config/01-pods/service-echo.yaml`
 
 ```yaml
@@ -267,6 +274,12 @@ hello from echo-pod
 
 This is an important moment in the tutorial: you are no longer talking to the Pod directly. You are talking to a stable Service endpoint that selects the Pod.
 
+Troubleshooting:
+
+- if `curl` cannot connect, make sure `kubectl port-forward` is still running in the foreground
+- if the Service exists but does not answer, run `kubectl get pods -n tutorial --show-labels` and confirm the Pod still has `app=echo`
+- if needed, inspect the Service selector with `kubectl get svc echo-service -n tutorial -o yaml`
+
 ---
 
 ## 5. Kubernetes networking
@@ -297,6 +310,12 @@ Expected response from `curl`:
 ```text
 hello from echo-pod
 ```
+
+Troubleshooting:
+
+- if `nslookup echo-service` fails, check that you are still inside the temporary shell pod and that the Service exists in the same namespace
+- if DNS resolves but `curl` fails, verify that the backend Pod is running and that the Service selector matches it
+- if the temporary pod exits too quickly, rerun the `kubectl run netshoot ...` command and test again
 
 ---
 
@@ -350,7 +369,16 @@ Examples of stateless applications:
 - nginx serving static files from an image or ConfigMap
 - a C# API that stores durable data in SQL Server
 
+Why is the C# API still considered stateless even though it works with durable data?
+
+Because the durable data lives in **SQL Server**, not inside the API container itself. The API can be replaced, restarted, or scaled out, and another identical API replica can still serve requests as long as it can reach the database.
+
 A stateful application, by contrast, keeps important durable state locally or depends on stable identity. SQL Server storing database files is the clearest stateful example in this tutorial.
+
+A useful rule of thumb is:
+
+- if you can replace one replica with another identical replica without losing the application's durable data, that part is usually **stateless**
+- if the workload itself owns the durable storage or needs a stable identity, it is usually **stateful**
 
 File: `config/01-pods/deployment-echo.yaml`
 
@@ -637,6 +665,12 @@ Expected response:
 
 This is your first example of Kubernetes injecting file content into a container at runtime.
 
+Troubleshooting:
+
+- if the page does not load, check `kubectl get pods -n tutorial` and make sure `static-nginx` is `Running`
+- if nginx is running but the page content is wrong, inspect the mounted ConfigMap with `kubectl get configmap static-site-content -n tutorial -o yaml`
+- if port-forward fails, confirm the Service exists with `kubectl get svc -n tutorial`
+
 ---
 
 ## 15. Basic Flask `/genkey` service behind nginx
@@ -684,6 +718,12 @@ This stage matters because it shows:
 - Service-to-Service communication by DNS name
 - nginx acting as a reverse proxy inside the cluster
 - container image build and local deployment
+
+Troubleshooting:
+
+- if the API pod is stuck in `ImagePullBackOff`, the image probably was not built into minikube successfully; rebuild it and recheck the Deployment
+- if `/genkey` returns an nginx error instead of JSON, inspect both the proxy pod logs and the API pod logs
+- if the API is running but key generation fails, check the container logs for `ssh-keygen`-related errors
 
 ---
 
@@ -771,6 +811,18 @@ At this point you have seen both patterns:
 2. built frontend image
 
 The tutorial uses both on purpose so the reader understands the difference.
+
+Troubleshooting:
+
+- if `genkey-web` enters `ImagePullBackOff`, the frontend image likely was not built with the correct working directory or Dockerfile path
+- the working build command used in verification was:
+
+```bash
+cd src/04-genkey-full
+minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
+```
+
+- if `/genkey/` loads but `/genkey/api` returns 404, make sure you are testing through the frontend entrypoint and not calling the backend with the wrong path
 
 ---
 
@@ -993,6 +1045,13 @@ In this version:
 - better cluster deployment strategy
 - better teaching example for real Kubernetes workflows
 
+The key conceptual difference is this:
+
+- startup-init treats schema management as part of the application's normal boot path
+- Job-based init treats schema management as a separate cluster task with its own lifecycle
+
+That separation is usually healthier. It makes failures easier to locate, limits privileges in the steady-state API, and better matches how Kubernetes wants you to model one-time setup work.
+
 ### Apply the improved manifests
 
 ```bash
@@ -1038,6 +1097,12 @@ Open:
 - Jobs as one-time cluster tasks
 - privilege separation between schema management and normal app runtime
 - a more maintainable deployment model for stateful applications
+
+Troubleshooting:
+
+- if the Job does not complete, inspect it with `kubectl describe job journal-db-init -n tutorial` and read its logs with `kubectl logs job/journal-db-init -n tutorial`
+- if the API fails after the Job completed, verify that the Secret-backed application connection string matches the login created by the initialization script
+- if the web UI loads but no data operations work, check the API pod logs rather than the web pod first
 
 ---
 
@@ -1197,6 +1262,12 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller --tail=100
 ```
 
 If the Ingress describes the expected rules and the backend Services have endpoints, the next thing to check is usually **how** you are reaching the ingress controller, not the YAML itself.
+
+Troubleshooting summary:
+
+- `404 Not Found` from nginx can mean you reached the ingress controller on the wrong port, not that the Ingress rule is invalid
+- missing endpoints usually means the backend Service selectors do not currently match healthy Pods
+- if the ingress controller is not ready, wait for the addon to finish creating the controller Pod before testing routes
 
 ---
 
