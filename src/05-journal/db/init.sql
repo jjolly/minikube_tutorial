@@ -1,0 +1,19 @@
+IF DB_ID(N'JournalDb') IS NULL
+BEGIN
+    CREATE DATABASE JournalDb;
+END;
+GO
+
+USE JournalDb;
+GO
+
+IF OBJECT_ID(N'dbo.Entries', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Entries (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        Title NVARCHAR(200) NOT NULL,
+        Body NVARCHAR(MAX) NOT NULL,
+        CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+END;
+GO

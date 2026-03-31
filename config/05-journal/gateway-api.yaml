@@ -1,0 +1,7 @@
+# This file is an optional next step, not part of the base runnable path.
+# It becomes runnable only after you install both:
+#   1. Gateway API CRDs
+#   2. a Gateway controller implementation
+#
+# The core tutorial uses Ingress as the runnable HTTP entry point first.
+# Keep this file as a reference/example until you choose a concrete controller.

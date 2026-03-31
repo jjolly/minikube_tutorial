@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tutorial-ingress
+  namespace: tutorial
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: tutorial.local
+      http:
+        paths:
+          - path: /genkey
+            pathType: Prefix
+            backend:
+              service:
+                name: genkey-web
+                port:
+                  number: 80
+          - path: /journal
+            pathType: Prefix
+            backend:
+              service:
+                name: journal-web
+                port:
+                  number: 80

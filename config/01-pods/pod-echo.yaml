@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: echo-pod
+  labels:
+    app: echo
+spec:
+  containers:
+    - name: echo
+      image: hashicorp/http-echo:1.0.0
+      args:
+        - "-text=hello from echo-pod"
+      ports:
+        - containerPort: 5678

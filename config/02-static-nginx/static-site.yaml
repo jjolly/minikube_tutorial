@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-site-content
+  namespace: tutorial
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>Minikube Tutorial - Static Site</title>
+      </head>
+      <body>
+        <h1>nginx is serving this page from Kubernetes</h1>
+        <p>This page comes from a ConfigMap-mounted file.</p>
+      </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-nginx
+  namespace: tutorial
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-nginx
+  template:
+    metadata:
+      labels:
+        app: static-nginx
+        tier: web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: site-content
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
+      volumes:
+        - name: site-content
+          configMap:
+            name: static-site-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-nginx
+  namespace: tutorial
+spec:
+  selector:
+    app: static-nginx
+  ports:
+    - port: 80
+      targetPort: 80

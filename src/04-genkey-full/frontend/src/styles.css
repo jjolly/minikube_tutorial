@@ -1,0 +1,27 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #f4f6f8;
+  color: #222;
+  margin: 0;
+}
+#app {
+  max-width: 900px;
+  margin: 2rem auto;
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+button {
+  padding: 0.8rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+pre {
+  white-space: pre-wrap;
+  background: #111;
+  color: #d7f9d7;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+}
