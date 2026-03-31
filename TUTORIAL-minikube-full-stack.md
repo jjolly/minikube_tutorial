@@ -690,6 +690,14 @@ Because it is understandable and practical:
 
 This approach is **not optimal** because the API runtime now needs privileges that are broader than it needs for normal request handling.
 
+It also creates a startup race:
+
+- SQL Server may still be starting when the API tries to connect
+- the API may fail on its first start if the database is not ready yet
+- Kubernetes may restart the API pod until the database becomes reachable
+
+That behavior is useful to observe because it shows one of the real operational drawbacks of schema creation during app startup.
+
 ### Build the journal API image
 
 ```bash
@@ -698,11 +706,68 @@ minikube image build -t journal-api:0.1.0 .
 cd ../../..
 ```
 
-### Apply the first-step manifests
+### Apply the first-step manifests in phases
+
+Apply the Secret, persistent volume claim, database Deployment, and database Service first:
 
 ```bash
-kubectl apply -f config/05-journal/step1-startup-init/
-kubectl get pods -n tutorial
+kubectl apply -f config/05-journal/step1-startup-init/00-secret.yaml
+kubectl apply -f config/05-journal/step1-startup-init/01-pvc.yaml
+kubectl apply -f config/05-journal/step1-startup-init/02-db-deployment.yaml
+kubectl apply -f config/05-journal/step1-startup-init/03-db-service.yaml
+```
+
+Now monitor SQL Server until it is actually ready:
+
+```bash
+kubectl get pods -n tutorial -w
+kubectl rollout status deployment/journal-db -n tutorial
+```
+
+When you are satisfied that the database is up, apply the API and web resources:
+
+```bash
+kubectl apply -f config/05-journal/step1-startup-init/04-api-deployment.yaml
+kubectl apply -f config/05-journal/step1-startup-init/05-api-service.yaml
+kubectl apply -f config/05-journal/step1-startup-init/06-web-assets-configmap.yaml
+kubectl apply -f config/05-journal/step1-startup-init/07-web-nginx-configmap.yaml
+kubectl apply -f config/05-journal/step1-startup-init/08-web-deployment.yaml
+kubectl apply -f config/05-journal/step1-startup-init/09-web-service.yaml
+```
+
+### How to monitor this step safely
+
+Watch the API pod and logs before moving on:
+
+```bash
+kubectl get pods -n tutorial -w
+kubectl logs -n tutorial -l app=journal-api --tail=100
+kubectl rollout status deployment/journal-api -n tutorial
+```
+
+What can happen here:
+
+- **best case**: SQL Server is ready in time, and the API starts cleanly
+- **common race case**: the API starts too early, fails to connect, and restarts
+- **continue only when** the `journal-api` Deployment reports successfully rolled out and the pod is `Running` and `Ready`
+
+If the database became ready after the API had already failed several times, a manual restart is a simple way to continue cleanly:
+
+```bash
+kubectl rollout restart deployment/journal-api -n tutorial
+kubectl rollout status deployment/journal-api -n tutorial
+```
+
+After the API is healthy, confirm it explicitly:
+
+```bash
+kubectl port-forward -n tutorial service/journal-api 8084:8080
+curl http://127.0.0.1:8084/healthz
+```
+
+In another terminal, you can then expose the web frontend:
+
+```bash
 kubectl port-forward -n tutorial service/journal-web 8083:80
 ```
 
@@ -716,6 +781,7 @@ Open:
 - PVC-backed SQL Server storage
 - application-driven schema bootstrap
 - nginx serving the journal UI and proxying `/journal/api/`
+- how startup ordering problems appear in real clusters
 
 ### Why this is not the end state
 
@@ -725,6 +791,7 @@ Startup-based schema creation mixes deployment concerns into the API runtime:
 - startup behavior becomes more complex
 - multiple replicas can complicate initialization workflows
 - database bootstrap and request serving are different operational concerns
+- the database readiness race becomes part of normal application startup
 
 That leads directly to the improved approach in the next section.
 
@@ -873,6 +940,52 @@ Apply it:
 kubectl apply -f config/05-journal/13-ingress.yaml
 kubectl get ingress -n tutorial
 ```
+
+### Important note about testing Ingress on minikube
+
+The Ingress resource describes routing rules, but the exact way you reach the ingress controller depends on how minikube exposes it in your environment.
+
+In the live verification pass for this tutorial, the reliable test path was through the ingress controller's **NodePort** with the correct `Host` header.
+
+Get the minikube IP and the controller's HTTP NodePort:
+
+```bash
+MINIKUBE_IP=$(minikube ip)
+NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
+echo "$MINIKUBE_IP"
+echo "$NODEPORT"
+```
+
+Then test the routes with the expected host header:
+
+```bash
+curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
+curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"
+curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
+```
+
+### What can go wrong
+
+If you instead try something like this:
+
+```bash
+curl -H 'Host: tutorial.local' "http://$(minikube ip)/genkey/"
+```
+
+you may get a default `404 Not Found` response depending on how the ingress controller is exposed in your local environment.
+
+That does **not** necessarily mean your Ingress object is wrong. It may only mean you are reaching the wrong port or exposure path.
+
+### How to confirm whether Ingress itself is healthy
+
+```bash
+kubectl describe ingress tutorial-ingress -n tutorial
+kubectl get svc -n ingress-nginx
+kubectl get endpoints -n tutorial genkey-web journal-web
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller --tail=100
+```
+
+If the Ingress describes the expected rules and the backend Services have endpoints, the next thing to check is usually **how** you are reaching the ingress controller, not the YAML itself.
 
 ---
 
