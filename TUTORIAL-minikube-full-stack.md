@@ -54,16 +54,99 @@ The tutorial introduces these Kubernetes ideas in this order:
 
 ## 1. Prerequisites
 
-You already have minikube running, which is a good starting point. This section documents a general install path so the tutorial is self-contained.
+Assume you are starting at a Linux shell prompt and you are not yet sure what is installed, what is configured, or whether minikube is already running. This section is written for that situation.
 
-### 1.1 Ubuntu packages
+You should assume only that:
+
+- you can log in as a normal user
+- you can use `sudo`
+- you are working inside WSL on either Ubuntu or openSUSE Leap
+
+If you already have some of these tools installed, the commands below are still useful because they help you verify what state the machine is in before you begin.
+
+### 1.1 Check what is already installed
+
+Before installing anything, inspect the environment.
+
+```bash
+uname -a
+cat /etc/os-release
+which docker || true
+which kubectl || true
+which minikube || true
+docker --version || true
+kubectl version --client || true
+minikube version || true
+```
+
+What this tells you:
+
+- `uname -a` confirms you are in a Linux environment
+- `/etc/os-release` tells you which distribution you are on
+- `which ...` checks whether a command is already on your `PATH`
+- the `--version` commands confirm whether the installed tools actually run
+
+If a command is missing, that is fine. That is exactly what this section is here to fix.
+
+### 1.2 Why this tutorial uses Docker as the minikube driver
+
+Minikube can run on top of different drivers and container runtimes. In practice, beginners often encounter these options first:
+
+- **Docker driver**
+  - usually the easiest local learning path
+  - familiar if you have seen container workflows before
+  - works well in WSL-based development setups
+- **Podman driver**
+  - viable in some environments
+  - attractive if you prefer a daemonless container tool
+  - less common in beginner minikube walkthroughs, so you may find fewer examples that match exactly
+- **KVM/libvirt or other VM-based drivers**
+  - useful on full Linux systems
+  - can be very solid
+  - usually adds more host setup complexity than is helpful for a first tutorial in WSL
+- **none driver / bare-metal style setups**
+  - powerful but not a beginner path
+  - easy to make host-level mistakes if you do not already understand the tradeoffs
+
+This tutorial chooses **Docker** because it is usually the least surprising route for someone coming from a Windows background with only light Linux command-line experience.
+
+Why Docker is a sensible default here:
+
+- it is widely documented
+- minikube works well with it in many WSL setups
+- the idea of “build an image, then run it” stays consistent across the tutorial
+- it avoids adding a second big conceptual hurdle while you are trying to learn Kubernetes itself
+
+This is not a claim that Docker is the only good choice. It is simply the most practical teaching choice for this tutorial.
+
+### 1.3 Why the Docker setup steps matter
+
+You will see these Docker-related steps below:
+
+- install the Docker package
+- start the Docker service when needed
+- add your user to the `docker` group
+- refresh your shell group membership with `newgrp docker`
+
+Why these steps are needed:
+
+- **install Docker** so minikube has a local container runtime/driver to use
+- **start the Docker service** so the Docker daemon is actually listening for work
+- **add your user to the `docker` group** so you do not have to prefix every Docker command with `sudo`
+- **run `newgrp docker`** so your current shell notices the new group membership without forcing a full logout/login cycle
+
+For someone new to Linux, that last point is especially easy to miss: being added to a group does not always affect the shell you are already sitting in. `newgrp docker` is a convenient way to refresh that in-place.
+
+### 1.4 Ubuntu packages
+
+Install the basic tools used throughout the tutorial:
 
 ```bash
 sudo apt update
 sudo apt install -y curl wget tar conntrack socat git ca-certificates
 ```
 
-If using Docker as the minikube driver:
+Install and configure Docker for this tutorial's minikube workflow:
 
 ```bash
 sudo apt install -y docker.io
@@ -71,14 +154,23 @@ sudo usermod -aG docker "$USER"
 newgrp docker
 ```
 
-### 1.2 openSUSE Leap packages
+After that, verify Docker is usable from your current shell:
+
+```bash
+docker --version
+docker ps
+```
+
+### 1.5 openSUSE Leap packages
+
+Install the basic tools used throughout the tutorial:
 
 ```bash
 sudo zypper refresh
 sudo zypper install -y curl wget tar conntrack-tools socat git ca-certificates
 ```
 
-If using Docker:
+Install and configure Docker:
 
 ```bash
 sudo zypper install -y docker
@@ -87,7 +179,14 @@ sudo usermod -aG docker "$USER"
 newgrp docker
 ```
 
-### 1.3 Install kubectl
+After that, verify Docker is usable:
+
+```bash
+docker --version
+docker ps
+```
+
+### 1.6 Install kubectl
 
 `kubectl` is the command-line client for the Kubernetes API server.
 
@@ -98,7 +197,7 @@ sudo mv kubectl /usr/local/bin/
 kubectl version --client
 ```
 
-### 1.4 Install minikube
+### 1.7 Install minikube
 
 ```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
@@ -106,7 +205,9 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 minikube version
 ```
 
-### 1.5 Start and verify the cluster
+### 1.8 Start and verify the cluster
+
+Start minikube with Docker as the driver:
 
 ```bash
 minikube start --driver=docker
@@ -114,11 +215,19 @@ kubectl get nodes
 kubectl cluster-info
 ```
 
-### Note for later refinement: container runtimes and driver choice
+What you should observe:
 
-During the polish phase, this tutorial should add a short comparison of the common container-runtime and driver choices available in a local minikube workflow, and explain why Docker was chosen here. The short version is that Docker is being used in this tutorial because it is common, familiar, and usually the least surprising path for a WSL-based learning environment.
+- `minikube start` should report that the cluster is starting and then running
+- `kubectl get nodes` should show a node named `minikube`
+- `kubectl cluster-info` should print API and service endpoints
 
-### 1.6 Enable ingress
+If `kubectl` later appears to be talking to an old or stale minikube endpoint, fix the context with:
+
+```bash
+minikube update-context
+```
+
+### 1.9 Enable ingress
 
 Ingress is the primary HTTP exposure path used in the main tutorial.
 
@@ -126,6 +235,11 @@ Ingress is the primary HTTP exposure path used in the main tutorial.
 minikube addons enable ingress
 minikube addons enable metrics-server
 ```
+
+Why these addons are enabled:
+
+- **ingress** provides the nginx ingress controller used later in the tutorial
+- **metrics-server** is not strictly required for every step, but it is a common supporting addon in minikube environments and useful to have available while learning
 
 ---
 
