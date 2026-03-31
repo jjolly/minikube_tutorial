@@ -225,6 +225,18 @@ echo-pod   1/1     Running   0          23s   10.244.0.6   minikube
 
 Pods are ephemeral. A pod can be recreated and receive a different IP address. A **Service** gives a stable virtual IP and DNS name that can target one or more matching pods.
 
+Small mental model:
+
+```text
+client
+  |
+  v
+Service (stable name / stable virtual IP)
+  |
+  v
+Pod
+```
+
 This is one of the most important mental-model shifts in Kubernetes:
 
 - you usually do **not** build application communication around Pod IPs
@@ -285,6 +297,15 @@ Troubleshooting:
 ## 5. Kubernetes networking
 
 Kubernetes networking is built around a few expectations:
+
+```text
+Pod A  --DNS lookup-->  Service name
+  |                      |
+  |------HTTP/TCP------> Service virtual IP
+                         |
+                         v
+                      backend Pod
+```
 
 - every pod gets an IP
 - pods can usually talk directly to other pods
@@ -556,6 +577,22 @@ We will first use ConfigMaps for a static web page because they are very easy to
 
 This is the first frontend pattern in the tutorial.
 
+```text
+ConfigMap (index.html)
+        |
+        v
+  mounted into nginx Pod
+        |
+        v
+   Service/static-nginx
+        |
+        v
+   kubectl port-forward
+        |
+        v
+      browser/curl
+```
+
 **Why use a ConfigMap here?**
 
 Because it is a great teaching tool:
@@ -698,6 +735,22 @@ Architecture:
 - `genkey-basic-api` — Flask app serving `/genkey`
 - `genkey-basic-proxy` — nginx reverse proxy
 
+```text
+browser/curl
+    |
+    v
+Service/genkey-basic-proxy
+    |
+    v
+nginx Pod
+    |
+    v
+Service/genkey-basic-api
+    |
+    v
+Flask API Pod
+```
+
 Build the API image into minikube:
 
 ```bash
@@ -746,6 +799,18 @@ Troubleshooting:
 ## 16. Richer frontend: built image instead of ConfigMap assets
 
 Now we revisit frontend delivery with a better packaging model.
+
+```text
+browser
+  |
+  v
+Service/genkey-web
+  |
+  v
+nginx frontend Pod  -- /genkey/api -->  Service/genkey-api  -->  Flask API Pod
+  |
+  '-- /genkey/ --> serves built React frontend files
+```
 
 Earlier, the ConfigMap-mounted static site was useful because it taught ConfigMaps clearly. But for a richer frontend application, packaging the frontend into an image is a better pattern.
 
@@ -877,6 +942,18 @@ A PVC is a request, not the storage implementation itself. In minikube, a storag
 ## 18. Journal application, first approach: schema init inside API startup
 
 This first journal deployment uses the simplest developer-friendly pattern:
+
+```text
+browser
+  |
+  v
+Service/journal-web
+  |
+  v
+nginx web Pod  -- /journal/api -->  Service/journal-api  -->  C# API Pod
+                                                          |
+                                                          '-- startup schema creation --> Service/journal-db --> SQL Server Pod + PVC
+```
 
 - SQL Server runs in the cluster
 - the API starts with elevated DB privileges
@@ -1073,6 +1150,20 @@ That leads directly to the improved approach in the next section.
 
 Now we split schema initialization away from the API.
 
+```text
+Job/journal-db-init  -->  Service/journal-db  -->  SQL Server Pod + PVC
+
+browser
+  |
+  v
+Service/journal-web
+  |
+  v
+nginx web Pod  -- /journal/api -->  Service/journal-api  -->  C# API Pod
+
+(schema work is no longer part of normal API startup)
+```
+
 In this version:
 
 - SQL Server still starts with persistent storage
@@ -1247,6 +1338,21 @@ kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutori
 ## 21. Ingress
 
 Ingress is the main HTTP exposure strategy for the core tutorial because it is minikube-friendly and easy to enable with the ingress addon.
+
+```text
+request: Host=tutorial.local, Path=/genkey/... or /journal/...
+                 |
+                 v
+         ingress-nginx controller
+                 |
+        +--------+--------+
+        |                 |
+        v                 v
+ Service/genkey-web   Service/journal-web
+        |                 |
+        v                 v
+   genkey frontend     journal frontend
+```
 
 File: `config/05-journal/13-ingress.yaml`
 
