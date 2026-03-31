@@ -412,9 +412,14 @@ spec:
 
 What the important fields do:
 
-- `replicas` — desired number of pod copies.
-- `selector.matchLabels` — tells the Deployment which pods belong to it.
+- `replicas` — desired number of pod copies. If one pod disappears, the Deployment tries to bring the actual state back to this desired state.
+- `selector.matchLabels` — tells the Deployment which pods belong to it. This must match the labels in the pod template.
 - `template` — pod template used for each replica.
+- `template.metadata.labels` — labels applied to every pod the Deployment creates. Services and other controllers often depend on these labels.
+- `template.spec.containers` — describes the container or containers each replica should run.
+- `ports.containerPort` — documents the port the application listens on inside the container.
+
+A subtle but important point: the Deployment does not directly run containers. It manages a ReplicaSet, and the ReplicaSet creates Pods from the `template` section. That is why the `template` block is the heart of a Deployment manifest.
 
 ```bash
 kubectl delete pod -n tutorial echo-pod --ignore-not-found
@@ -627,8 +632,19 @@ spec:
 Pay attention to these fields:
 
 - `ConfigMap.data.index.html` — stores the page content.
+- `Deployment.spec.selector.matchLabels` — tells the Deployment which Pods it owns.
+- `template.metadata.labels` — labels that connect the Pod to both the Deployment and the Service.
+- `containers.image` — the nginx image that will serve the mounted file.
+- `volumeMounts.mountPath` — where the file appears inside the container filesystem.
+- `volumeMounts.subPath` — mounts just one file from the ConfigMap to the nginx document root instead of mounting the entire ConfigMap directory there.
 - `volumes.configMap.name` — connects the pod to the ConfigMap.
-- `volumeMounts.subPath` — mounts just one file from the ConfigMap to the nginx document root.
+- `Service.spec.selector` — tells the Service which Pods should receive traffic.
+
+This example is useful because it shows three different layers working together:
+
+1. a ConfigMap stores content
+2. a Deployment runs nginx and mounts that content
+3. a Service gives you a stable way to reach the nginx Pod
 
 ```bash
 kubectl apply -f config/02-static-nginx/static-site.yaml
@@ -850,8 +866,11 @@ spec:
 
 Field intent:
 
-- `accessModes` — how the volume may be mounted.
+- `metadata.name` — the claim name other Kubernetes objects will reference.
+- `accessModes` — how the volume may be mounted. `ReadWriteOnce` means one node can mount it for read/write use at a time, which is a common fit for a single SQL Server instance.
 - `resources.requests.storage` — requested storage size.
+
+A PVC is a request, not the storage implementation itself. In minikube, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
 
 ---
 
@@ -996,6 +1015,38 @@ Expected response shape:
 ]
 ```
 
+### Important YAML ideas in this step
+
+The step 1 manifests are worth reading carefully because each object has a clear purpose:
+
+- `00-secret.yaml`
+  - stores the SQL Server `sa` password
+  - stores the admin-capable connection string used by the API during schema creation
+- `01-pvc.yaml`
+  - requests durable storage for SQL Server data files
+- `02-db-deployment.yaml`
+  - runs the SQL Server container
+  - uses environment variables from the Secret
+  - mounts the PVC so database files survive Pod recreation
+  - includes readiness and liveness probes so Kubernetes can tell when the database is actually serving
+- `03-db-service.yaml`
+  - gives SQL Server a stable in-cluster DNS name: `journal-db`
+- `04-api-deployment.yaml`
+  - runs the C# API
+  - injects the admin connection string from the Secret
+  - sets `Journal__AutoMigrate=true`, which is the key flag that turns startup schema creation on
+- `05-api-service.yaml`
+  - exposes the API on a stable ClusterIP Service
+- `06-web-assets-configmap.yaml`
+  - stores the simple journal frontend files
+- `07-web-nginx-configmap.yaml`
+  - stores the nginx configuration that serves `/journal/` and proxies `/journal/api/`
+- `08-web-deployment.yaml`
+  - runs nginx for the journal frontend
+  - mounts both the web assets and the nginx config
+- `09-web-service.yaml`
+  - gives the frontend a stable Service endpoint
+
 ### What this step is demonstrating
 
 - Secrets carrying SQL credentials
@@ -1092,6 +1143,33 @@ Open:
 
 - `http://127.0.0.1:8084/journal/`
 
+### Important YAML ideas in this step
+
+The step 2 manifests are similar to step 1, but the differences matter a lot:
+
+- `00-secret.yaml`
+  - still stores the `sa` password
+  - now also stores the application user's password and the lower-privilege application connection string
+- `01-pvc.yaml`
+  - still requests durable SQL Server storage
+- `02-db-deployment.yaml` and `03-db-service.yaml`
+  - still run and expose SQL Server in the cluster
+- `04-schema-configmap.yaml`
+  - stores the SQL initialization script template that creates the database schema and lower-privilege login
+- `05-db-init-job.yaml`
+  - runs once instead of living forever like a Deployment
+  - waits for SQL Server to become reachable
+  - renders the SQL template with Secret-backed values
+  - applies schema setup separately from the API lifecycle
+- `06-api-deployment.yaml`
+  - runs the same API image as before
+  - now uses the application connection string instead of the admin one
+  - sets `Journal__AutoMigrate=false`, which is the key sign that schema creation is no longer part of normal API startup
+- `07-api-service.yaml`, `08-web-assets-configmap.yaml`, `09-web-nginx-configmap.yaml`, `10-web-deployment.yaml`, and `11-web-service.yaml`
+  - serve the same frontend role as in step 1
+
+When comparing step 1 and step 2 YAML, the most important lesson is not just that there is a Job now. It is that the API manifest itself has become simpler and safer because database bootstrap logic moved out of it.
+
 ### What the improved step teaches
 
 - Jobs as one-time cluster tasks
@@ -1147,6 +1225,17 @@ roleRef:
   name: tutorial-readonly
 ```
 
+Important field explanations:
+
+- `ServiceAccount` — an identity for workloads or API clients inside the cluster.
+- `Role` — a namespace-scoped permission set.
+- `rules[].apiGroups` — selects which API groups the rule applies to. `""` means the core API group.
+- `rules[].resources` — which resource types may be accessed.
+- `rules[].verbs` — which actions are allowed.
+- `RoleBinding` — connects a subject, such as a ServiceAccount, to a Role.
+- `subjects[]` — the identity receiving the permissions.
+- `roleRef` — the Role being granted.
+
 ```bash
 kubectl apply -f config/05-journal/12-rbac-readonly.yaml
 kubectl auth can-i list pods --as=system:serviceaccount:tutorial:tutorial-reader -n tutorial
@@ -1194,6 +1283,19 @@ Why this is the main path:
 - easy to explain
 - easy to enable in minikube
 - sufficient for the tutorial’s HTTP routing goals
+
+Important field explanations:
+
+- `metadata.name` — the name of the Ingress object itself.
+- `metadata.namespace` — places the Ingress in the same namespace as the backend Services it references.
+- `spec.ingressClassName` — tells Kubernetes which ingress controller should implement this Ingress. Here it is the nginx ingress controller.
+- `rules[].host` — the expected HTTP host header for these routes.
+- `rules[].http.paths[].path` — the URL prefix to match.
+- `pathType: Prefix` — tells the controller to treat `/genkey` and `/journal` as path prefixes rather than exact full-path matches.
+- `backend.service.name` — the Service that should receive traffic for that path.
+- `backend.service.port.number` — the Service port to send traffic to.
+
+This manifest is doing path-based routing, not direct Pod routing. Ingress sends traffic to Services, and the Services then send traffic to Pods.
 
 Apply it:
 
