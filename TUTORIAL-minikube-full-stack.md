@@ -472,7 +472,7 @@ Before moving on, delete this standalone Pod so the next section can recreate it
 kubectl delete pod echo-pod
 ```
 
-That cleanup belongs here because this first Pod example is meant to stand alone before the tutorial introduces Services.
+This cleanup keeps the first Pod example self-contained before the tutorial moves on to the next networking step.
 
 This is a good place to call out another important Kubernetes mindset shift: Pods are simple running instances of processes. You generally do not "pause" or "stop" them the way you might with individual Docker containers. When a Pod has been defined, Kubernetes tries to create it. To stop that Pod, either let the program inside it exit or delete the Pod. In later sections, Kubernetes controllers will take over that create/remove cycle automatically.
 
