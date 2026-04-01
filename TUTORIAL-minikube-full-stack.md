@@ -626,6 +626,9 @@ Namespaces help by giving related resources their own named space inside the clu
 - you can avoid mixing unrelated workloads together
 - you can run the same kinds of objects in different namespaces without name collisions between those namespaces
 - commands become easier to reason about because you can ask specifically for the objects in one namespace
+- access control often becomes easier to manage because permissions are very commonly granted within a namespace boundary rather than across the whole cluster
+
+That last point becomes especially important when RBAC is introduced later. In real clusters, namespaces are often a major part of how teams separate ownership and control who can view or change which resources.
 
 In this section, you are creating a new namespace named `tutorial` and then recreating the echo Pod and Service inside it.
 
@@ -652,6 +655,40 @@ What to notice here:
 - `kubectl get all -n tutorial` should show only the resources in that namespace, which makes the output easier to focus on
 
 This is another habit worth building early: when you read Kubernetes commands and YAML, pay attention not just to the object name, but also to which namespace it lives in.
+
+### 6.1 Contexts and changing the default namespace
+
+So far, the tutorial has used `-n tutorial` explicitly. That is a good habit when learning because it makes the target namespace obvious.
+
+Kubernetes also has the idea of a **context** in your kubeconfig. A context can store several defaults at once, including:
+
+- which cluster you are talking to
+- which user or credential set you are using
+- which namespace `kubectl` should use by default
+
+You can inspect your current context with:
+
+```bash
+kubectl config current-context
+kubectl config view --minify
+```
+
+If you want your current context to default to the `tutorial` namespace, you can set it like this:
+
+```bash
+kubectl config set-context --current --namespace=tutorial
+```
+
+After that, commands such as `kubectl get pods` will use `tutorial` by default until you change the context or override it with `-n`.
+
+You can confirm the effect with:
+
+```bash
+kubectl get pods
+kubectl get svc
+```
+
+For a beginner tutorial, it is still often clearer to keep writing `-n tutorial` in commands. But it is worth knowing that context defaults exist, because in real Kubernetes work they are used constantly.
 
 ---
 
@@ -1683,6 +1720,10 @@ Troubleshooting:
 
 **RBAC** controls who can do what in Kubernetes.
 
+This is where namespaces become especially important. In everyday Kubernetes usage, namespaces are one of the main boundaries used to control access. A common pattern is not "can this user touch the cluster?" but rather "what can this user do inside this namespace?"
+
+That is why this example uses a `Role` and `RoleBinding` in the `tutorial` namespace instead of jumping straight to cluster-wide permissions. It demonstrates the more common and safer pattern: grant only the permissions needed, and grant them only in the namespace where they are needed.
+
 Example file: `config/05-journal/12-rbac-readonly.yaml`
 
 ```yaml
@@ -1724,6 +1765,7 @@ Important field explanations:
 
 - `ServiceAccount` — an identity for workloads or API clients inside the cluster.
 - `Role` — a namespace-scoped permission set.
+  - this namespace scoping is a big deal: a `Role` in `tutorial` does not automatically grant the same access in `default`, `kube-system`, or any other namespace
 - `rules[].apiGroups` — selects which API groups the rule applies to. `""` means the core API group.
 - `rules[].resources` — which resource types may be accessed.
 - `rules[].verbs` — which actions are allowed.
@@ -1738,6 +1780,8 @@ kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutori
 ```
 
 The second command should print `no`. The `|| true` keeps that expected denial from looking like a shell-script failure.
+
+That expected `no` is part of the lesson: the identity has read-only access in the `tutorial` namespace, not broad write access across the cluster.
 
 ---
 
