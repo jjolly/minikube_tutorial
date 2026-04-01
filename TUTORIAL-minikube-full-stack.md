@@ -618,6 +618,17 @@ Troubleshooting:
 
 A **namespace** groups resources so you can separate environments and reduce clutter.
 
+Up to this point, you have been working in the default namespace without saying much about it. That is convenient for the first few examples, but real Kubernetes usage quickly becomes harder to follow if everything is left in `default`.
+
+Namespaces help by giving related resources their own named space inside the cluster. In practice, that means:
+
+- you can group tutorial resources separately from system resources
+- you can avoid mixing unrelated workloads together
+- you can run the same kinds of objects in different namespaces without name collisions between those namespaces
+- commands become easier to reason about because you can ask specifically for the objects in one namespace
+
+In this section, you are creating a new namespace named `tutorial` and then recreating the echo Pod and Service inside it.
+
 File: `config/01-pods/namespace-tutorial.yaml`
 
 ```yaml
@@ -633,6 +644,14 @@ kubectl apply -n tutorial -f config/01-pods/pod-echo.yaml
 kubectl apply -n tutorial -f config/01-pods/service-echo.yaml
 kubectl get all -n tutorial
 ```
+
+What to notice here:
+
+- `-n tutorial` tells `kubectl` to create or query objects in the `tutorial` namespace instead of `default`
+- the Pod and Service names are still `echo-pod` and `echo-service`, but now they live inside `tutorial`
+- `kubectl get all -n tutorial` should show only the resources in that namespace, which makes the output easier to focus on
+
+This is another habit worth building early: when you read Kubernetes commands and YAML, pay attention not just to the object name, but also to which namespace it lives in.
 
 ---
 
