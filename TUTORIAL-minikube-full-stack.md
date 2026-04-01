@@ -425,6 +425,8 @@ kubectl get pod echo-pod -o wide
 
 You will see a cluster-internal Pod IP, something like `10.244.0.56`.
 
+In the next command, we are going to create a new temporary Pod whose only job is to act as a client and try to reach `echo-pod` over the cluster network.
+
 A first-time user may reasonably ask: why are we about to create a second Pod just to reach the first one?
 
 Because the `echo-pod` web server is not directly reachable from outside the cluster. To talk to it by IP, we need to send the request from **inside** the cluster network. A simple way to do that is to start a temporary second Pod that has `curl` available and use it as a test client.
