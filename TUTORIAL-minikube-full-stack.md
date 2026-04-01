@@ -415,15 +415,19 @@ How to read this without getting overwhelmed:
 
 For a first-time user, the most important habit is this: when a Pod does not behave the way you expected, look at `Status`, `Containers`, `Conditions`, and `Events` before worrying about the rest of the output.
 
-At this point, the Pod is running an HTTP server, but reaching it directly is awkward. That awkwardness is one of the reasons Services matter.
+At this point, the Pod is running an HTTP server, but reaching it directly is awkward. This can be demonstrated by attempting to access our running Pod's web server with a few commands.
 
-If you want to prove the Pod is serving traffic before introducing a Service, first get the Pod IP:
+First get the Pod IP:
 
 ```bash
 kubectl get pod echo-pod -o wide
 ```
 
-You will see a cluster-internal Pod IP, something like `10.244.0.56`. Then call that Pod IP directly from a temporary shell inside the cluster:
+You will see a cluster-internal Pod IP, something like `10.244.0.56`.
+
+A first-time user may reasonably ask: why are we about to create a second Pod just to reach the first one?
+
+Because the `echo-pod` web server is not directly reachable from outside the cluster. To talk to it by IP, we need to send the request from **inside** the cluster network. A simple way to do that is to start a temporary second Pod that has `curl` available and use it as a test client.
 
 ```bash
 POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
@@ -436,16 +440,21 @@ Expected response:
 hello from echo-pod
 ```
 
+What this demonstrates:
+
+- the first Pod really is serving HTTP traffic
+- the Pod IP is usable from inside the cluster network
+- reaching a Pod directly takes extra work and cluster-specific knowledge
+
 Why this is not very useful as a general access pattern:
 
 - you had to discover the Pod IP first
 - that IP is internal to the cluster
 - if the Pod is recreated, the IP may change
+- you had to create a second Pod just to test the first one from inside the cluster
 - other workloads should not have to track individual Pod addresses by hand
 
-The next section fixes exactly that problem by introducing a Service with a stable name and stable virtual IP.
-
-Before moving on, delete this standalone Pod so the next section can recreate it intentionally as the backend for the Service example:
+Before moving on, delete this standalone Pod so the next section can recreate it intentionally as the backend for the next networking step:
 
 ```bash
 kubectl delete pod echo-pod
