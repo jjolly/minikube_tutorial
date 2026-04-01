@@ -540,6 +540,14 @@ Leave that port-forward running in the first terminal. In a second terminal, tes
 curl http://127.0.0.1:8080
 ```
 
+If you are using WSL, you can also open a Windows browser to:
+
+```text
+http://localhost:8080
+```
+
+That is a useful early demonstration that the Kubernetes environment you are working with inside WSL can still be reached conveniently from the Windows side through the forwarded localhost port. The same pattern will make later web-based examples easier to test.
+
 What you should observe:
 
 - the Service should be created immediately
