@@ -224,7 +224,27 @@ What you should observe:
 - `kubectl get nodes` should show a node named `minikube`
 - `kubectl cluster-info` should print API and service endpoints
 
-If `kubectl` later appears to be talking to an old or stale minikube endpoint, fix the context with:
+If `kubectl` later appears to be talking to an old or stale minikube endpoint, here is what that usually looks like and how to recognize it.
+
+A stale endpoint means `kubectl` is still using a kubeconfig entry that points at an older minikube API server address or certificate after minikube was restarted, recreated, or otherwise changed.
+
+Common signs include:
+
+- `kubectl` fails with connection errors such as `The connection to the server <ip>:<port> was refused`, `Unable to connect to the server`, or `i/o timeout`
+- `kubectl` fails with TLS or certificate errors such as `x509: certificate is valid for ... not ...`
+- `kubectl cluster-info` reports a control-plane address that does not match the current minikube instance
+- `kubectl get pods -A` or similar commands show unexpected old state, empty results, or resources that do not match the cluster you just started
+
+To check whether this is happening, compare what `kubectl` thinks the current cluster is with what minikube reports:
+
+```bash
+kubectl config current-context
+kubectl cluster-info
+kubectl config view --minify
+minikube status
+```
+
+If the server address, certificates, or cluster state do not line up with the minikube instance you just started, fix the context with:
 
 ```bash
 minikube update-context
