@@ -467,6 +467,8 @@ What the fields are for:
 
 - `kind: Service` — declares a stable network endpoint.
 - `selector` — chooses pods with matching labels.
+  - in this example, `app: echo` matches the earlier `echo-pod`, because that Pod was created with the label `app: echo`
+  - this label match is what makes the Service send traffic to that Pod
 - `port` — port exposed by the Service.
 - `targetPort` — port on the selected pods.
 
