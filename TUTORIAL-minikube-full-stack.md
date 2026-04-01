@@ -415,13 +415,43 @@ How to read this without getting overwhelmed:
 
 For a first-time user, the most important habit is this: when a Pod does not behave the way you expected, look at `Status`, `Containers`, `Conditions`, and `Events` before worrying about the rest of the output.
 
-When you are done inspecting this first standalone Pod example, clean it up before moving on:
+At this point, the Pod is running an HTTP server, but reaching it directly is awkward. That awkwardness is one of the reasons Services matter.
+
+If you want to prove the Pod is serving traffic before introducing a Service, first get the Pod IP:
+
+```bash
+kubectl get pod echo-pod -o wide
+```
+
+You will see a cluster-internal Pod IP, something like `10.244.0.56`. Then call that Pod IP directly from a temporary shell inside the cluster:
+
+```bash
+POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
+kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
+```
+
+Expected response:
+
+```text
+hello from echo-pod
+```
+
+Why this is not very useful as a general access pattern:
+
+- you had to discover the Pod IP first
+- that IP is internal to the cluster
+- if the Pod is recreated, the IP may change
+- other workloads should not have to track individual Pod addresses by hand
+
+The next section fixes exactly that problem by introducing a Service with a stable name and stable virtual IP.
+
+Before moving on, delete this standalone Pod so the next section can recreate it intentionally as the backend for the Service example:
 
 ```bash
 kubectl delete pod echo-pod
 ```
 
-That cleanup belongs here because this Pod was created in the default namespace before namespaces and Deployments are introduced.
+That cleanup belongs here because this first Pod example is meant to stand alone before the tutorial introduces Services.
 
 ---
 
@@ -472,7 +502,11 @@ What the fields are for:
 - `port` — port exposed by the Service.
 - `targetPort` — port on the selected pods.
 
+Before creating the Service, recreate the Pod so there is actually a matching backend for the Service to target:
+
 ```bash
+kubectl apply -f config/01-pods/pod-echo.yaml
+kubectl wait --for=condition=Ready pod/echo-pod --timeout=120s
 kubectl apply -f config/01-pods/service-echo.yaml
 kubectl port-forward service/echo-service 8080:80
 ```
