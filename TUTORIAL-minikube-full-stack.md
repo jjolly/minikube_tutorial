@@ -356,6 +356,65 @@ NAME       READY   STATUS    RESTARTS   AGE   IP           NODE
 echo-pod   1/1     Running   0          23s   10.244.0.6   minikube
 ```
 
+`kubectl describe pod echo-pod` produces much more detail. That can feel noisy the first time you see it, so here is a shortened example with guidance on what to focus on first:
+
+```text
+Name:             echo-pod
+Namespace:        default
+Node:             minikube/192.168.49.2
+Start Time:       Wed, 01 Apr 2026 07:57:01 -0600
+Labels:           app=echo
+Status:           Running
+IP:               10.244.0.56
+Containers:
+  echo:
+    Image:         hashicorp/http-echo:1.0.0
+    Port:          5678/TCP
+    Args:
+      -text=hello from echo-pod
+    State:          Running
+    Ready:          True
+    Restart Count:  0
+Conditions:
+  Type                 Status
+  Initialized          True
+  Ready                True
+  ContainersReady      True
+  PodScheduled         True
+Events:
+  Type    Reason     Message
+  ----    ------     -------
+  Normal  Scheduled  Successfully assigned default/echo-pod to minikube
+  Normal  Pulled     Container image "hashicorp/http-echo:1.0.0" already present on machine
+  Normal  Created    Created container: echo
+  Normal  Started    Started container echo
+```
+
+How to read this without getting overwhelmed:
+
+- `Name`, `Namespace`, and `Labels`
+  - identify which object you are looking at and how other Kubernetes objects may select it
+- `Node`
+  - shows which Kubernetes node is running the Pod
+  - in this tutorial it should usually be `minikube`
+- `Status`
+  - the quick high-level state of the Pod
+  - for this step, `Running` is what you want
+- `IP`
+  - the Pod's cluster-internal IP address
+  - useful for understanding that Pods really do get their own network identity
+- `Containers`
+  - confirms the image, exposed port, startup arguments, and whether the container is actually running
+  - `Ready: True` and `Restart Count: 0` are especially reassuring for a first example
+- `Conditions`
+  - Kubernetes' checklist for whether the Pod made it through scheduling and startup successfully
+  - `PodScheduled=True`, `Initialized=True`, and `Ready=True` are the main first-pass signals to notice
+- `Events`
+  - often the most useful troubleshooting section
+  - if something goes wrong, this is where you often first see why: image pull failures, scheduling problems, crash loops, and probe failures commonly show up here
+
+For a first-time user, the most important habit is this: when a Pod does not behave the way you expected, look at `Status`, `Containers`, `Conditions`, and `Events` before worrying about the rest of the output.
+
 When you are done inspecting this first standalone Pod example, clean it up before moving on:
 
 ```bash
