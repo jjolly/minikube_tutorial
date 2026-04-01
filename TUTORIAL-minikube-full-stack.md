@@ -414,6 +414,11 @@ What the fields are for:
 ```bash
 kubectl apply -f config/01-pods/service-echo.yaml
 kubectl port-forward service/echo-service 8080:80
+```
+
+Leave that port-forward running in the first terminal. In a second terminal, test the Service:
+
+```bash
 curl http://127.0.0.1:8080
 ```
 
@@ -434,8 +439,8 @@ This is an important moment in the tutorial: you are no longer talking to the Po
 Troubleshooting:
 
 - if `curl` cannot connect, make sure `kubectl port-forward` is still running in the foreground
-- if the Service exists but does not answer, run `kubectl get pods -n tutorial --show-labels` and confirm the Pod still has `app=echo`
-- if needed, inspect the Service selector with `kubectl get svc echo-service -n tutorial -o yaml`
+- if the Service exists but does not answer, run `kubectl get pods --show-labels` and confirm the Pod still has `app=echo`
+- if needed, inspect the Service selector with `kubectl get svc echo-service -o yaml`
 
 ---
 
@@ -460,9 +465,7 @@ Pod A  --DNS lookup-->  Service name
 Test from a temporary shell pod:
 
 ```bash
-kubectl run netshoot --image=nicolaka/netshoot:latest -it --rm -- sh
-nslookup echo-service
-curl http://echo-service
+kubectl run netshoot --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc 'nslookup echo-service && curl -fsS http://echo-service'
 ```
 
 What you should observe:
@@ -588,13 +591,14 @@ What the important fields do:
 A subtle but important point: the Deployment does not directly run containers. It manages a ReplicaSet, and the ReplicaSet creates Pods from the `template` section. That is why the `template` block is the heart of a Deployment manifest.
 
 ```bash
+kubectl delete pod -n tutorial echo-pod --ignore-not-found
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
 kubectl scale deployment/echo-deployment -n tutorial --replicas=3
 ```
 
 What you should observe:
 
-- the old standalone Pod is removed
+- the old standalone Pod is removed before the Deployment takes over
 - the Deployment creates replacement Pods under ReplicaSet control
 - after scaling, you should see three running replicas
 
@@ -987,6 +991,11 @@ Deploy it:
 ```bash
 kubectl apply -f config/03-genkey-basic/genkey-basic.yaml
 kubectl port-forward -n tutorial service/genkey-basic-proxy 8081:80
+```
+
+Leave that port-forward running in the first terminal. In a second terminal, call the proxied API:
+
+```bash
 curl http://127.0.0.1:8081/genkey
 ```
 
@@ -1070,11 +1079,13 @@ kubectl apply -f config/04-genkey-full/image-based/
 kubectl port-forward -n tutorial service/genkey-web 8082:80
 ```
 
+Leave that port-forward running in the first terminal.
+
 Open:
 
 - `http://127.0.0.1:8082/genkey/`
 
-You can also verify the proxied API path through the frontend entrypoint:
+In a second terminal, you can also verify the proxied API path through the frontend entrypoint:
 
 ```bash
 curl http://127.0.0.1:8082/genkey/api
@@ -1244,7 +1255,7 @@ kubectl apply -f config/05-journal/step1-startup-init/09-web-service.yaml
 
 ### How to monitor this step safely
 
-Watch the API pod and logs before moving on:
+Watch the API pod and logs before moving on. Run these in separate terminals, because the first two commands keep streaming output:
 
 ```bash
 kubectl get pods -n tutorial -w
@@ -1269,6 +1280,11 @@ After the API is healthy, confirm it explicitly:
 
 ```bash
 kubectl port-forward -n tutorial service/journal-api 8084:8080
+```
+
+Leave that port-forward running in one terminal. In another terminal:
+
+```bash
 curl http://127.0.0.1:8084/healthz
 ```
 
@@ -1419,9 +1435,18 @@ That separation is usually healthier. It makes failures easier to locate, limits
 
 ### Apply the improved manifests
 
+If you already ran the startup-init version in this same namespace, remove it before applying the improved version. This avoids in-place replacement races where a second SQL Server pod briefly tries to start against the same PVC.
+
+```bash
+kubectl delete -f config/05-journal/step1-startup-init/
+```
+
+Now apply the improved manifests:
+
 ```bash
 kubectl apply -f config/05-journal/step2-job-init/
 kubectl get pods,jobs -n tutorial
+kubectl wait --for=condition=complete job/journal-db-init -n tutorial --timeout=600s
 kubectl logs -n tutorial job/journal-db-init
 kubectl port-forward -n tutorial service/journal-web 8084:80
 ```
@@ -1432,10 +1457,17 @@ What you should observe:
 - the `journal-db-init` Job should move to `Complete`
 - the API should start with `autoMigrate` disabled because schema management has been separated out
 
+Leave the journal web port-forward running in its own terminal.
+
 A useful direct health check is:
 
 ```bash
 kubectl port-forward -n tutorial service/journal-api 8085:8080
+```
+
+In another terminal:
+
+```bash
 curl http://127.0.0.1:8085/healthz
 ```
 
@@ -1553,8 +1585,10 @@ Important field explanations:
 ```bash
 kubectl apply -f config/05-journal/12-rbac-readonly.yaml
 kubectl auth can-i list pods --as=system:serviceaccount:tutorial:tutorial-reader -n tutorial
-kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutorial-reader -n tutorial
+kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutorial-reader -n tutorial || true
 ```
+
+The second command should print `no`. The `|| true` keeps that expected denial from looking like a shell-script failure.
 
 ---
 
