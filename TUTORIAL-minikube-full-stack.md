@@ -336,6 +336,14 @@ NAME       READY   STATUS    RESTARTS   AGE   IP           NODE
 echo-pod   1/1     Running   0          23s   10.244.0.6   minikube
 ```
 
+When you are done inspecting this first standalone Pod example, clean it up before moving on:
+
+```bash
+kubectl delete pod echo-pod
+```
+
+That cleanup belongs here because this Pod was created in the default namespace before namespaces and Deployments are introduced.
+
 ---
 
 ## 4. Services
@@ -560,7 +568,6 @@ What the important fields do:
 A subtle but important point: the Deployment does not directly run containers. It manages a ReplicaSet, and the ReplicaSet creates Pods from the `template` section. That is why the `template` block is the heart of a Deployment manifest.
 
 ```bash
-kubectl delete pod -n tutorial echo-pod --ignore-not-found
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
 kubectl scale deployment/echo-deployment -n tutorial --replicas=3
 ```
