@@ -309,6 +309,8 @@ kubectl delete pod bb-demo
 
 A small but important detail: Pods started this way may remain visible in Kubernetes after their command has finished so you can still inspect their status and logs, but they are not something you "reuse". Once the original command is done, that Pod's job is over.
 
+It is also useful to understand what Kubernetes does **not** do here. A Pod is not usually treated like a long-lived container that you manually stop, pause, and resume later. In this tutorial's model, once a Pod exists, it runs until the process inside it exits or until Kubernetes deletes the Pod. Later sections will show that higher-level controllers automate Pod creation and replacement for you, which is one of the key differences between working with raw Pods and working with Deployments.
+
 ### 3.2 Create a long-running pod from YAML
 
 Pods can also be defined declaratively in YAML. That approach is better for repeatable configuration, and it works naturally for longer-running processes such as a web server that should stay up without you waiting for a one-shot shell command to finish.
@@ -471,6 +473,8 @@ kubectl delete pod echo-pod
 ```
 
 That cleanup belongs here because this first Pod example is meant to stand alone before the tutorial introduces Services.
+
+This is a good place to call out another important Kubernetes mindset shift: Pods are simple running instances of processes. You generally do not "pause" or "stop" them the way you might with individual Docker containers. When a Pod has been defined, Kubernetes tries to create it. To stop that Pod, either let the program inside it exit or delete the Pod. In later sections, Kubernetes controllers will take over that create/remove cycle automatically.
 
 ---
 
