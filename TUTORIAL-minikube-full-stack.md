@@ -296,6 +296,10 @@ A **pod** is the smallest deployable unit in Kubernetes. A pod usually runs one 
 
 ### 3.1 Run a short-lived BusyBox pod
 
+A Pod can be started directly from the command line with `kubectl run`. That is convenient for quick experiments, but the Pod only lasts as long as the command running inside it lasts.
+
+In this example, the command prints a message and then uses `sleep 15` to keep the Pod alive for a few extra seconds. That pause gives you time to inspect the Pod while it is still running, and then again after the command has completed.
+
 ```bash
 kubectl run bb-demo --image=busybox:1.36 --restart=Never --command -- sh -c 'echo hello from kubernetes && sleep 15'
 kubectl logs bb-demo
@@ -303,7 +307,11 @@ kubectl get pod bb-demo
 kubectl delete pod bb-demo
 ```
 
+A small but important detail: Pods started this way may remain visible in Kubernetes after their command has finished so you can still inspect their status and logs, but they are not something you "reuse". Once the original command is done, that Pod's job is over.
+
 ### 3.2 Create a long-running pod from YAML
+
+Pods can also be defined declaratively in YAML. That approach is better for repeatable configuration, and it works naturally for longer-running processes such as a web server that should stay up without you waiting for a one-shot shell command to finish.
 
 File: `config/01-pods/pod-echo.yaml`
 
