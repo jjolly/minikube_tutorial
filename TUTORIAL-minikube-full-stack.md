@@ -646,6 +646,10 @@ Examples:
 - a Deployment uses labels to identify the pods it manages
 - operators use labels to filter resources
 
+You have already seen one important label use earlier in the Service section. The `echo-service` Service selected Pods with the label `app: echo`, which is how it knew that `echo-pod` was one of its backends.
+
+You are also about to see labels again in the Deployment section. They are extremely common in normal Kubernetes usage, so it is worth getting into the habit of looking for them in YAML and command output.
+
 ```bash
 kubectl get pods -n tutorial --show-labels
 kubectl get pods -n tutorial -l app=echo
