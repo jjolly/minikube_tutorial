@@ -715,6 +715,8 @@ kubectl get pods -n tutorial -l app=echo
 
 ## 8. Deployments
 
+You have already seen Pods as individual workload instances and Services as stable front doors. A **Deployment** adds the next layer: declarative management of a replaceable set of Pods.
+
 A **Deployment** manages rollout for a stateless application.
 
 A **stateless application** is one where an individual application instance does not hold the only copy of important long-term data inside its own process or filesystem. If the container restarts, another identical instance can usually take over.
@@ -780,6 +782,12 @@ What the important fields do:
 
 A subtle but important point: the Deployment does not directly run containers. It manages a ReplicaSet, and the ReplicaSet creates Pods from the `template` section. That is why the `template` block is the heart of a Deployment manifest.
 
+Another useful way to think about it is this:
+
+- the **Deployment** declares the desired rollout and replica count
+- the **ReplicaSet** maintains the matching number of Pods
+- the **Pods** run the actual containers
+
 ```bash
 kubectl delete pod -n tutorial echo-pod --ignore-not-found
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
@@ -817,7 +825,9 @@ That distribution behavior is commonly described as **load balancing**. In a beg
 
 In this example, that means `echo-service` can forward a request to any of the `echo-deployment` Pods created by the Deployment, not just the first one that started.
 
-Test that by forwarding the same Service again:
+Test that by forwarding the same Service again.
+
+If you still have the earlier `kubectl port-forward` from the Service section running on port `8080`, stop it with `Ctrl+C` first, then start a fresh one:
 
 ```bash
 kubectl port-forward -n tutorial service/echo-service 8080:80
@@ -841,7 +851,13 @@ Expected response:
 hello from echo-deployment
 ```
 
-This is the point where Kubernetes starts managing a desired replica count for you instead of just running a single unmanaged Pod, while clients can keep using the same stable Service endpoint.
+This is the point where the earlier pieces start fitting together:
+
+- the Deployment keeps the desired number of Pods running
+- the Service provides one stable address for clients
+- labels connect the Service to the right backend Pods
+
+That combination is one of the core Kubernetes patterns you will use repeatedly throughout the rest of the tutorial.
 
 ---
 
