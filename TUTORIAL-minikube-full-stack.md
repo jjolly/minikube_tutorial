@@ -728,12 +728,16 @@ Why is the C# API still considered stateless even though it works with durable d
 
 Because the durable data lives in **SQL Server**, not inside the API container itself. The API can be replaced, restarted, or scaled out, and another identical API replica can still serve requests as long as it can reach the database.
 
+A container having a writable filesystem does **not** automatically make the workload stateful. What matters is whether that replica owns important durable data that must survive the replacement of that replica.
+
 A stateful application, by contrast, keeps important durable state locally or depends on stable identity. SQL Server storing database files is the clearest stateful example in this tutorial.
 
 A useful rule of thumb is:
 
 - if you can replace one replica with another identical replica without losing the application's durable data, that part is usually **stateless**
 - if the workload itself owns the durable storage or needs a stable identity, it is usually **stateful**
+
+> **Contrast:** A Deployment can create Pods that mount storage, but that does not make Deployment the best mental model for every persistent workload. In this section, we use Deployments to learn rollout, replacement, and scaling with a clearly replaceable application. Later, [Persistent Volumes](#17-persistent-volumes) introduces durable storage, and the journal database shows what changes when part of the system is stateful.
 
 File: `config/01-pods/deployment-echo.yaml`
 
@@ -1330,6 +1334,8 @@ minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
 ## 17. Persistent Volumes
 
 A **PersistentVolumeClaim** requests durable storage for a workload.
+
+Earlier, the Deployments section focused on replaceable stateless replicas. Here we switch to the other side of the contrast: SQL Server is stateful because it owns durable database files that should survive Pod restarts and replacement.
 
 We need this for SQL Server because the journal database is stateful and should survive pod restarts.
 
