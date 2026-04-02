@@ -34,22 +34,19 @@ Minikube gives you a local Kubernetes cluster you can experiment with safely. On
 
 The tutorial introduces these Kubernetes ideas in this order:
 
-1. Pods
-2. Services
-3. Networking
-4. Namespaces
-5. Labels
-6. Deployments
-7. kube-apiserver
-8. Nodes and kubelet
-9. etcd
-10. metrics-server and `kubectl top`
-11. Secrets
-12. ConfigMaps
-13. Persistent Volumes
-14. RBAC
-15. Ingress
-16. Advanced topics: Gateway API options
+1. Cluster infrastructure
+2. Pods
+3. Services
+4. Networking
+5. Namespaces
+6. Labels
+7. Deployments
+8. Secrets
+9. ConfigMaps
+10. Persistent Volumes
+11. RBAC
+12. Ingress
+13. Advanced topics: Gateway API options
 
 ---
 
@@ -290,11 +287,221 @@ config/
 
 ---
 
-## 3. Pods
+## 3. Cluster infrastructure
+
+This section groups together several cluster-infrastructure topics that are important for administration, troubleshooting, and understanding how Kubernetes works internally. They support the cluster components you will use most often, but they are not where most day-to-day application work revolves.
+
+Most application-focused Kubernetes usage centers on objects such as Pods, Services, Deployments, ConfigMaps, Secrets, and PersistentVolumeClaims. The topics in this section matter because they help you understand the control plane, inspect cluster health, and troubleshoot when something is wrong.
+
+### 3.1 kube-apiserver
+
+The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
+
+These commands help you inspect what the API server knows how to serve, which cluster context you are talking to, and what your objects look like from Kubernetes's point of view.
+
+```bash
+kubectl api-resources | head -40
+kubectl api-versions
+kubectl config current-context
+kubectl cluster-info
+kubectl get deployment echo-deployment -n tutorial -o yaml
+```
+
+What these commands show and why they matter:
+
+- `kubectl api-resources | head -40`
+  - lists resource types the API server knows about, such as Pods, Services, Deployments, ConfigMaps, and Secrets
+  - helps answer questions like "what kinds of objects can this cluster manage?"
+  - useful when you are exploring Kubernetes for the first time or when you want to confirm the exact resource name to use with `kubectl get`, `kubectl describe`, or `kubectl explain`
+- `kubectl api-versions`
+  - lists API group and version names exposed by the cluster, such as `v1`, `apps/v1`, or `batch/v1`
+  - useful when reading YAML, because Kubernetes objects are identified by both `kind` and `apiVersion`
+  - helps you see that different kinds of objects live in different API groups
+- `kubectl config current-context`
+  - shows which kubeconfig context `kubectl` is currently using
+  - useful when you want to confirm that your commands are targeting the minikube cluster rather than some other cluster
+  - especially important if you work with more than one cluster over time
+- `kubectl cluster-info`
+  - shows the main control-plane endpoints for the current cluster
+  - useful as a quick sanity check that the cluster is reachable and that `kubectl` is talking to the cluster you expect
+- `kubectl get deployment echo-deployment -n tutorial -o yaml`
+  - asks the API server for the full YAML form of the Deployment object currently stored in cluster state
+  - useful when you want to compare your manifest with the live object, inspect status fields, or see defaulted values Kubernetes has filled in
+
+What to notice:
+
+- the API server is not only for creating objects; it is also how you discover cluster capabilities and inspect live state
+- the cluster stores more than "pods and services"; it exposes many resource types and API groups
+- live YAML often includes more information than the original file you applied, because Kubernetes adds status and defaulted fields
+
+### 3.2 Nodes and kubelet
+
+A **node** is a machine that runs workloads. In minikube, you typically have one node. The **kubelet** is the agent on that node that makes sure the assigned containers actually run.
+
+These commands help you answer three practical questions:
+
+- what nodes exist in the cluster?
+- what is this specific node reporting about itself?
+- what system Pods are running to support the cluster?
+
+```bash
+kubectl get nodes -o wide
+kubectl describe node minikube
+kubectl get pods -n kube-system -o wide
+```
+
+What these commands show and why they matter:
+
+- `kubectl get nodes -o wide`
+  - lists the nodes known to the cluster
+  - in minikube, you will usually see a single node named `minikube`
+  - the `-o wide` output adds extra details such as internal IP, operating system, kernel, and container runtime
+  - useful as a quick health check: if the node is `Ready`, the cluster has somewhere to run Pods
+- `kubectl describe node minikube`
+  - shows detailed information about one node
+  - useful when you want to inspect labels, capacity, allocatable CPU and memory, conditions, addresses, and recent node-related events
+  - this is one of the first places to look when Pods are not scheduling, when resources seem tight, or when you want to understand what the node is advertising to Kubernetes
+- `kubectl get pods -n kube-system -o wide`
+  - lists the Pods in the `kube-system` namespace, which is where many core cluster components run
+  - useful for seeing that the cluster itself is made of Pods too, not only your application workloads
+  - often used when troubleshooting cluster services such as DNS, metrics-server, ingress, or other addons
+
+What to notice:
+
+- the node is the machine-level execution target, while the kubelet is the node-local agent that keeps Pod state in sync with what the control plane asked for
+- `describe node` gives much richer operational detail than `get nodes`
+- the `kube-system` namespace gives you a view into the cluster's own supporting services, which is helpful when something seems wrong beyond just your application
+
+### 3.3 etcd
+
+**etcd** is the key-value store that holds cluster state. When you create a namespace, Secret, Deployment, or Service, the desired state is stored through the API server and backed by etcd.
+
+A useful mental model is:
+
+```text
+your manifest / kubectl command
+            |
+            v
+      kube-apiserver
+            |
+            v
+          etcd
+            |
+            v
+controllers and kubelets react to the stored desired state
+```
+
+This means etcd is not where your application data normally lives. It stores Kubernetes control-plane state: what objects exist, what their specifications are, and what status Kubernetes has recorded about them.
+
+```bash
+kubectl get pods -n kube-system
+kubectl get deployment echo-deployment -n tutorial -o yaml
+```
+
+What these commands help you notice:
+
+- `kubectl get pods -n kube-system`
+  - lets you look for an `etcd-*` Pod in a control-plane-based minikube cluster
+  - helps make the idea concrete that etcd is part of the cluster's own infrastructure
+- `kubectl get deployment echo-deployment -n tutorial -o yaml`
+  - shows an example of the kind of object state Kubernetes is storing and serving back through the API server
+  - useful because etcd itself is usually not something you query directly during normal cluster usage; instead, you see its effects through the Kubernetes API
+
+When this matters operationally:
+
+- if etcd is unavailable, the control plane cannot reliably read or write cluster state
+- if object definitions are changing in unexpected ways, the API server and stored state are part of the path you need to think about
+- when backing up or restoring a self-managed cluster, etcd is one of the most important control-plane data stores
+
+What to notice:
+
+- etcd supports the cluster; it is not where your journal database or other application persistence should go
+- most users spend much more time working with Pods, Services, and Deployments than thinking directly about etcd
+- etcd still matters because Kubernetes depends on it to remember the desired state that controllers are trying to enforce
+
+### 3.4 metrics-server and `kubectl top`
+
+The `metrics-server` addon collects resource-usage data from the cluster and makes it available through the Kubernetes metrics APIs. The most common way you will notice it is through the `kubectl top` commands.
+
+Small mental model:
+
+```text
+node / kubelet metrics
+        |
+        v
+   metrics-server
+        |
+        v
+    Kubernetes metrics API
+        |
+        v
+     kubectl top
+```
+
+Why this matters:
+
+- it gives you a way to inspect actual CPU and memory usage
+- it helps make `requests` and `limits` feel concrete instead of decorative
+- it gives you another way to understand what your cluster is doing while workloads are running
+
+### Verify that metrics-server is working
+
+```bash
+kubectl get pods -n kube-system
+kubectl top nodes
+kubectl top pods -n tutorial
+```
+
+What these commands show and why they matter:
+
+- `kubectl get pods -n kube-system`
+  - lets you confirm that a `metrics-server` Pod is present and running
+  - useful if `kubectl top` fails or reports that metrics are unavailable
+- `kubectl top nodes`
+  - shows current CPU and memory usage for cluster nodes
+  - useful when you want a quick operational view of whether the node is under resource pressure
+- `kubectl top pods -n tutorial`
+  - shows current CPU and memory usage for Pods in your tutorial namespace
+  - useful for comparing lightweight workloads such as nginx with heavier workloads such as SQL Server
+
+What you should observe:
+
+- `kubectl top nodes` should show CPU and memory usage for the minikube node
+- `kubectl top pods -n tutorial` may show no tutorial workloads yet if you run it this early in the tutorial, but it becomes much more interesting after later sections create more Pods
+
+Example shape of output:
+
+```text
+NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+minikube   429m         10%    1903Mi          24%
+```
+
+```text
+NAME                                 CPU(cores)   MEMORY(bytes)
+static-nginx-...                     1m           6Mi
+genkey-api-...                       2m           28Mi
+journal-api-...                      5m           74Mi
+journal-db-...                       98m          834Mi
+```
+
+How to interpret what you are seeing:
+
+- a small nginx Pod will usually show very low CPU and memory usage
+- the journal database typically uses much more memory than the frontend examples
+- the numbers you see here are **current usage**, not the same thing as requested or limited resources in YAML
+
+That distinction matters:
+
+- **requests** tell Kubernetes what resources a Pod expects to need for scheduling
+- **limits** tell Kubernetes the upper bound it may use before throttling or enforcement
+
+---
+
+## 4. Pods
 
 A **pod** is the smallest deployable unit in Kubernetes. A pod usually runs one application container, though it can run more than one when the containers are meant to cooperate tightly.
 
-### 3.1 Run a short-lived BusyBox pod
+### 4.1 Run a short-lived BusyBox pod
 
 A Pod can be started directly from the command line with `kubectl run`. That is convenient for quick experiments, but the Pod only lasts as long as the command running inside it lasts.
 
@@ -311,7 +518,7 @@ A small but important detail: Pods started this way may remain visible in Kubern
 
 It is also useful to understand what Kubernetes does **not** do here. A Pod is not usually treated like a long-lived container that you manually stop, pause, and resume later. In this tutorial's model, once a Pod exists, it runs until the process inside it exits or until Kubernetes deletes the Pod. Later sections will show that higher-level controllers automate Pod creation and replacement for you, which is one of the key differences between working with raw Pods and working with Deployments.
 
-### 3.2 Create a long-running pod from YAML
+### 4.2 Create a long-running pod from YAML
 
 Pods can also be defined declaratively in YAML. That approach is better for repeatable configuration, and it works naturally for longer-running processes such as a web server that should stay up without you waiting for a one-shot shell command to finish.
 
@@ -478,7 +685,7 @@ This is a good place to call out another important Kubernetes mindset shift: Pod
 
 ---
 
-## 4. Services
+## 5. Services
 
 Pods are ephemeral. A pod can be recreated and receive a different IP address. A **Service** gives a stable virtual IP and DNS name that can target one or more matching pods.
 
@@ -570,7 +777,7 @@ Troubleshooting:
 
 ---
 
-## 5. Kubernetes networking
+## 6. Kubernetes networking
 
 Kubernetes networking is built around a few expectations:
 
@@ -614,7 +821,7 @@ Troubleshooting:
 
 ---
 
-## 6. Namespaces
+## 7. Namespaces
 
 A **namespace** groups resources so you can separate environments and reduce clutter.
 
@@ -656,7 +863,7 @@ What to notice here:
 
 This is another habit worth building early: when you read Kubernetes commands and YAML, pay attention not just to the object name, but also to which namespace it lives in.
 
-### 6.1 Contexts and changing the default namespace
+### 7.1 Contexts and changing the default namespace
 
 So far, the tutorial has used `-n tutorial` explicitly. That is a useful habit when first using Kubernetes because it makes the target namespace obvious.
 
@@ -692,7 +899,7 @@ When first using Kubernetes, it is still often clearer to keep writing `-n tutor
 
 ---
 
-## 7. Labels
+## 8. Labels
 
 **Labels** are key/value pairs attached to objects. Kubernetes uses them heavily for selection.
 
@@ -713,7 +920,7 @@ kubectl get pods -n tutorial -l app=echo
 
 ---
 
-## 8. Deployments
+## 9. Deployments
 
 You have already seen Pods as individual workload instances and Services as stable front doors. A **Deployment** adds the next layer: declarative management of a replaceable set of Pods.
 
@@ -739,7 +946,7 @@ A useful rule of thumb is:
 - if you can replace one replica with another identical replica without losing the application's durable data, that part is usually **stateless**
 - if the workload itself owns the durable storage or needs a stable identity, it is usually **stateful**
 
-> **Contrast:** A Deployment can create Pods that mount storage, but that does not make Deployment the best mental model for every persistent workload. In this section, we use Deployments to learn rollout, replacement, and scaling with a clearly replaceable application. Later, [Persistent Volumes](#17-persistent-volumes) introduces durable storage, and the journal database shows what changes when part of the system is stateful.
+> **Contrast:** A Deployment can create Pods that mount storage, but that does not make Deployment the best mental model for every persistent workload. In this section, we use Deployments to learn rollout, replacement, and scaling with a clearly replaceable application. Later, [Persistent Volumes](#15-persistent-volumes) introduces durable storage, and the journal database shows what changes when part of the system is stateful.
 
 File: `config/01-pods/deployment-echo.yaml`
 
@@ -861,181 +1068,7 @@ That combination is one of the core Kubernetes patterns you will use repeatedly 
 
 ---
 
-## 9. kube-apiserver
-
-The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
-
-These commands help you inspect what the API server knows how to serve, which cluster context you are talking to, and what your objects look like from Kubernetes's point of view.
-
-```bash
-kubectl api-resources | head -40
-kubectl api-versions
-kubectl config current-context
-kubectl cluster-info
-kubectl get deployment echo-deployment -n tutorial -o yaml
-```
-
-What these commands show and why they matter:
-
-- `kubectl api-resources | head -40`
-  - lists resource types the API server knows about, such as Pods, Services, Deployments, ConfigMaps, and Secrets
-  - helps answer questions like "what kinds of objects can this cluster manage?"
-  - useful when you are exploring Kubernetes for the first time or when you want to confirm the exact resource name to use with `kubectl get`, `kubectl describe`, or `kubectl explain`
-- `kubectl api-versions`
-  - lists API group and version names exposed by the cluster, such as `v1`, `apps/v1`, or `batch/v1`
-  - useful when reading YAML, because Kubernetes objects are identified by both `kind` and `apiVersion`
-  - helps you see that different kinds of objects live in different API groups
-- `kubectl config current-context`
-  - shows which kubeconfig context `kubectl` is currently using
-  - useful when you want to confirm that your commands are targeting the minikube cluster rather than some other cluster
-  - especially important if you work with more than one cluster over time
-- `kubectl cluster-info`
-  - shows the main control-plane endpoints for the current cluster
-  - useful as a quick sanity check that the cluster is reachable and that `kubectl` is talking to the cluster you expect
-- `kubectl get deployment echo-deployment -n tutorial -o yaml`
-  - asks the API server for the full YAML form of the Deployment object currently stored in cluster state
-  - useful when you want to compare your manifest with the live object, inspect status fields, or see defaulted values Kubernetes has filled in
-
-What to notice:
-
-- the API server is not only for creating objects; it is also how you discover cluster capabilities and inspect live state
-- the cluster stores more than "pods and services"; it exposes many resource types and API groups
-- live YAML often includes more information than the original file you applied, because Kubernetes adds status and defaulted fields
-
----
-
-## 10. Nodes and kubelet
-
-A **node** is a machine that runs workloads. In minikube, you typically have one node. The **kubelet** is the agent on that node that makes sure the assigned containers actually run.
-
-These commands help you answer three practical questions:
-
-- what nodes exist in the cluster?
-- what is this specific node reporting about itself?
-- what system Pods are running to support the cluster?
-
-```bash
-kubectl get nodes -o wide
-kubectl describe node minikube
-kubectl get pods -n kube-system -o wide
-```
-
-What these commands show and why they matter:
-
-- `kubectl get nodes -o wide`
-  - lists the nodes known to the cluster
-  - in minikube, you will usually see a single node named `minikube`
-  - the `-o wide` output adds extra details such as internal IP, operating system, kernel, and container runtime
-  - useful as a quick health check: if the node is `Ready`, the cluster has somewhere to run Pods
-- `kubectl describe node minikube`
-  - shows detailed information about one node
-  - useful when you want to inspect labels, capacity, allocatable CPU and memory, conditions, addresses, and recent node-related events
-  - this is one of the first places to look when Pods are not scheduling, when resources seem tight, or when you want to understand what the node is advertising to Kubernetes
-- `kubectl get pods -n kube-system -o wide`
-  - lists the Pods in the `kube-system` namespace, which is where many core cluster components run
-  - useful for seeing that the cluster itself is made of Pods too, not only your application workloads
-  - often used when troubleshooting cluster services such as DNS, metrics-server, ingress, or other addons
-
-What to notice:
-
-- the node is the machine-level execution target, while the kubelet is the node-local agent that keeps Pod state in sync with what the control plane asked for
-- `describe node` gives much richer operational detail than `get nodes`
-- the `kube-system` namespace gives you a view into the cluster's own supporting services, which is helpful when something seems wrong beyond just your application
-
----
-
-## 11. etcd
-
-**etcd** is the key-value store that holds cluster state. When you create a namespace, secret, deployment, or service, the desired state is stored through the API server and backed by etcd.
-
-```bash
-kubectl get pods -n kube-system
-```
-
-Look for an `etcd-*` pod in the control plane.
-
----
-
-## 12. metrics-server and `kubectl top`
-
-Earlier, the tutorial enabled the `metrics-server` addon. This is where it becomes useful.
-
-The metrics-server collects resource-usage data from the cluster and makes it available through the Kubernetes metrics APIs. The most common way you will notice it is through the `kubectl top` commands.
-
-Small mental model:
-
-```text
-node / kubelet metrics
-        |
-        v
-   metrics-server
-        |
-        v
-    Kubernetes metrics API
-        |
-        v
-     kubectl top
-```
-
-Why this matters in this tutorial:
-
-- it gives you a way to inspect actual CPU and memory usage
-- it helps make `requests` and `limits` feel concrete instead of decorative
-- it gives you another way to understand what your cluster is doing while workloads are running
-
-### Verify that metrics-server is working
-
-```bash
-kubectl get pods -n kube-system
-kubectl top nodes
-kubectl top pods -n tutorial
-```
-
-What you should observe:
-
-- `kubectl top nodes` should show CPU and memory usage for the minikube node
-- `kubectl top pods -n tutorial` should show resource usage for Pods in your tutorial namespace once you have workloads running there
-
-Example shape of output:
-
-```text
-NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
-minikube   429m         10%    1903Mi          24%
-```
-
-```text
-NAME                                 CPU(cores)   MEMORY(bytes)
-static-nginx-...                     1m           6Mi
-genkey-api-...                       2m           28Mi
-journal-api-...                      5m           74Mi
-journal-db-...                       98m          834Mi
-```
-
-### How to interpret what you are seeing
-
-A few practical observations:
-
-- a tiny nginx Pod will usually show very low CPU and memory usage
-- the journal database typically uses much more memory than the simple frontend examples
-- the numbers you see here are **current usage**, not the same thing as requested or limited resources in YAML
-
-That distinction matters:
-
-- **requests** tell Kubernetes what resources a Pod expects to need for scheduling
-- **limits** tell Kubernetes the upper bound it may use before throttling or enforcement
-- `kubectl top` shows what the workload is actually using right now
-
-Those three ideas are related, but they are not interchangeable.
-
-### Troubleshooting
-
-- if `kubectl top` says metrics are not available yet, wait a minute and try again
-- if you do not see tutorial Pods in `kubectl top pods -n tutorial`, make sure you have actually deployed workloads in the `tutorial` namespace first
-- if the addon seems unhealthy, inspect `kube-system` Pods and look for a metrics-server Pod that is still starting or failing
-
----
-
-## 13. Secrets
+## 10. Secrets
 
 A **Secret** stores sensitive values such as passwords, tokens, and connection strings.
 
@@ -1064,7 +1097,7 @@ We will use Secrets for SQL Server credentials later in the tutorial.
 
 ---
 
-## 13. ConfigMaps
+## 11. ConfigMaps
 
 A **ConfigMap** stores non-secret configuration data.
 
@@ -1097,7 +1130,7 @@ We will first use ConfigMaps for a static web page because they are straightforw
 
 ---
 
-## 14. Static nginx web page using a ConfigMap
+## 12. Static nginx web page using a ConfigMap
 
 This is the first frontend pattern in the tutorial.
 
@@ -1250,7 +1283,7 @@ Troubleshooting:
 
 ---
 
-## 15. Basic Flask `/genkey` service behind nginx
+## 13. Basic Flask `/genkey` service behind nginx
 
 This stage introduces a reverse proxy and service-to-service routing.
 
@@ -1325,7 +1358,7 @@ Troubleshooting:
 
 ---
 
-## 16. Richer frontend: built image instead of ConfigMap assets
+## 14. Richer frontend: built image instead of ConfigMap assets
 
 Now we revisit frontend delivery with a better packaging model.
 
@@ -1438,7 +1471,7 @@ minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
 
 ---
 
-## 17. Persistent Volumes
+## 15. Persistent Volumes
 
 A **PersistentVolumeClaim** requests durable storage for a workload.
 
@@ -1472,7 +1505,7 @@ A PVC is a request, not the storage implementation itself. In minikube, a storag
 
 ---
 
-## 18. Journal application, first approach: schema init inside API startup
+## 16. Journal application, first approach: schema init inside API startup
 
 This first journal deployment uses the simplest developer-friendly pattern:
 
@@ -1684,7 +1717,7 @@ That leads directly to the improved approach in the next section.
 
 ---
 
-## 19. Journal application, improved approach: dedicated database-init Job
+## 17. Journal application, improved approach: dedicated database-init Job
 
 Now we split schema initialization away from the API.
 
@@ -1829,7 +1862,7 @@ Troubleshooting:
 
 ---
 
-## 20. RBAC
+## 18. RBAC
 
 **RBAC** controls who can do what in Kubernetes.
 
@@ -1898,7 +1931,7 @@ That expected `no` is part of the lesson: the identity has read-only access in t
 
 ---
 
-## 21. Ingress
+## 19. Ingress
 
 Ingress is the main HTTP exposure strategy for the core tutorial because it works well with minikube and is straightforward to enable with the ingress addon.
 
@@ -2042,7 +2075,7 @@ Troubleshooting summary:
 
 ---
 
-## 22. Advanced topics: Gateway and alternatives to Ingress
+## 20. Advanced topics: Gateway and alternatives to Ingress
 
 The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
 
@@ -2079,7 +2112,7 @@ If you later want one advanced Gateway-focused extension, the best first options
 
 ---
 
-## 23. What is already ready for polish later
+## 21. What is already ready for polish later
 
 This version is meant to have the right **structure** and **teaching contrasts** first.
 
