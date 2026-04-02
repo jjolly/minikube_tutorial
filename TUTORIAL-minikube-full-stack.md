@@ -865,6 +865,8 @@ That combination is one of the core Kubernetes patterns you will use repeatedly 
 
 The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
 
+These commands help you inspect what the API server knows how to serve, which cluster context you are talking to, and what your objects look like from Kubernetes's point of view.
+
 ```bash
 kubectl api-resources | head -40
 kubectl api-versions
@@ -873,17 +875,72 @@ kubectl cluster-info
 kubectl get deployment echo-deployment -n tutorial -o yaml
 ```
 
+What these commands show and why they matter:
+
+- `kubectl api-resources | head -40`
+  - lists resource types the API server knows about, such as Pods, Services, Deployments, ConfigMaps, and Secrets
+  - helps answer questions like "what kinds of objects can this cluster manage?"
+  - useful when you are exploring Kubernetes for the first time or when you want to confirm the exact resource name to use with `kubectl get`, `kubectl describe`, or `kubectl explain`
+- `kubectl api-versions`
+  - lists API group and version names exposed by the cluster, such as `v1`, `apps/v1`, or `batch/v1`
+  - useful when reading YAML, because Kubernetes objects are identified by both `kind` and `apiVersion`
+  - helps you see that different kinds of objects live in different API groups
+- `kubectl config current-context`
+  - shows which kubeconfig context `kubectl` is currently using
+  - useful when you want to confirm that your commands are targeting the minikube cluster rather than some other cluster
+  - especially important if you work with more than one cluster over time
+- `kubectl cluster-info`
+  - shows the main control-plane endpoints for the current cluster
+  - useful as a quick sanity check that the cluster is reachable and that `kubectl` is talking to the cluster you expect
+- `kubectl get deployment echo-deployment -n tutorial -o yaml`
+  - asks the API server for the full YAML form of the Deployment object currently stored in cluster state
+  - useful when you want to compare your manifest with the live object, inspect status fields, or see defaulted values Kubernetes has filled in
+
+What to notice:
+
+- the API server is not only for creating objects; it is also how you discover cluster capabilities and inspect live state
+- the cluster stores more than "pods and services"; it exposes many resource types and API groups
+- live YAML often includes more information than the original file you applied, because Kubernetes adds status and defaulted fields
+
 ---
 
 ## 10. Nodes and kubelet
 
 A **node** is a machine that runs workloads. In minikube, you typically have one node. The **kubelet** is the agent on that node that makes sure the assigned containers actually run.
 
+These commands help you answer three practical questions:
+
+- what nodes exist in the cluster?
+- what is this specific node reporting about itself?
+- what system Pods are running to support the cluster?
+
 ```bash
 kubectl get nodes -o wide
 kubectl describe node minikube
 kubectl get pods -n kube-system -o wide
 ```
+
+What these commands show and why they matter:
+
+- `kubectl get nodes -o wide`
+  - lists the nodes known to the cluster
+  - in minikube, you will usually see a single node named `minikube`
+  - the `-o wide` output adds extra details such as internal IP, operating system, kernel, and container runtime
+  - useful as a quick health check: if the node is `Ready`, the cluster has somewhere to run Pods
+- `kubectl describe node minikube`
+  - shows detailed information about one node
+  - useful when you want to inspect labels, capacity, allocatable CPU and memory, conditions, addresses, and recent node-related events
+  - this is one of the first places to look when Pods are not scheduling, when resources seem tight, or when you want to understand what the node is advertising to Kubernetes
+- `kubectl get pods -n kube-system -o wide`
+  - lists the Pods in the `kube-system` namespace, which is where many core cluster components run
+  - useful for seeing that the cluster itself is made of Pods too, not only your application workloads
+  - often used when troubleshooting cluster services such as DNS, metrics-server, ingress, or other addons
+
+What to notice:
+
+- the node is the machine-level execution target, while the kubelet is the node-local agent that keeps Pod state in sync with what the control plane asked for
+- `describe node` gives much richer operational detail than `get nodes`
+- the `kube-system` namespace gives you a view into the cluster's own supporting services, which is helpful when something seems wrong beyond just your application
 
 ---
 
