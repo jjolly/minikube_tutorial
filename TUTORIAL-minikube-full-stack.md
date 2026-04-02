@@ -102,13 +102,13 @@ Minikube can run on top of different drivers and container runtimes. In practice
 - **Podman driver**
   - viable in some environments
   - attractive if you prefer a daemonless container tool
-  - less common in beginner minikube walkthroughs, so you may find fewer examples that match exactly
+  - less common in minikube walkthroughs aimed at people first using Kubernetes, so you may find fewer examples that match exactly
 - **KVM/libvirt or other VM-based drivers**
   - useful on full Linux systems
   - can be very solid
   - usually adds more host setup complexity than is helpful for a first tutorial in WSL
 - **none driver / bare-metal style setups**
-  - powerful but not a beginner path
+  - powerful, but usually not the best path when first using Kubernetes
   - easy to make host-level mistakes if you do not already understand the tradeoffs
 
 This tutorial chooses **Docker** because it is usually the least surprising route for someone coming from a Windows background with only light Linux command-line experience.
@@ -688,7 +688,7 @@ kubectl get pods
 kubectl get svc
 ```
 
-For a beginner tutorial, it is still often clearer to keep writing `-n tutorial` in commands. But it is worth knowing that context defaults exist, because in real Kubernetes work they are used constantly.
+When first using Kubernetes, it is still often clearer to keep writing `-n tutorial` in commands. But it is worth knowing that context defaults exist, because in real Kubernetes work they are used constantly.
 
 ---
 
@@ -821,7 +821,7 @@ Because the Deployment reuses the label `app: echo`, the earlier `echo-service` 
 
 When there are multiple matching Pods, the Service does not "belong" to one specific Pod. Instead, it selects all Pods whose labels match the selector and sends each new connection to one of the healthy backends. From the client side, you still use one stable Service address; inside the cluster, Kubernetes distributes traffic across the matching replica set.
 
-That distribution behavior is commonly described as **load balancing**. In a beginner-friendly sense, that means the Service helps spread requests across the available healthy replicas instead of forcing every request to go to one fixed Pod.
+That distribution behavior is commonly described as **load balancing**. In terms that should feel familiar to a new Kubernetes user, that means the Service helps spread requests across the available healthy replicas instead of forcing every request to go to one fixed Pod.
 
 In this example, that means `echo-service` can forward a request to any of the `echo-deployment` Pods created by the Deployment, not just the first one that started.
 
