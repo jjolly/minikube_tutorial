@@ -93,10 +93,10 @@ That is not a problem. At this stage, you are only checking what is already pres
 
 ### 1.2 Why this tutorial uses Docker as the minikube driver
 
-Minikube can run on top of different drivers and container runtimes. In practice, beginners often encounter these options first:
+Minikube can run on top of different drivers and container runtimes. In practice, these are the options people often encounter first when first using Kubernetes locally:
 
 - **Docker driver**
-  - usually the easiest local learning path
+  - usually the most straightforward local path when first setting things up
   - familiar if you have seen container workflows before
   - works well in WSL-based development setups
 - **Podman driver**
@@ -658,7 +658,7 @@ This is another habit worth building early: when you read Kubernetes commands an
 
 ### 6.1 Contexts and changing the default namespace
 
-So far, the tutorial has used `-n tutorial` explicitly. That is a good habit when learning because it makes the target namespace obvious.
+So far, the tutorial has used `-n tutorial` explicitly. That is a useful habit when first using Kubernetes because it makes the target namespace obvious.
 
 Kubernetes also has the idea of a **context** in your kubeconfig. A context can store several defaults at once, including:
 
@@ -1036,7 +1036,7 @@ Field intent:
 - `data` — key/value content stored in the ConfigMap.
 - multiline entries under `data` are useful when storing small files.
 
-We will first use ConfigMaps for a static web page because they are very easy to inspect and teach. Later we will contrast that with building frontend assets into an image.
+We will first use ConfigMaps for a static web page because they are straightforward to inspect and teach with. Later we will contrast that with building frontend assets into an image.
 
 ---
 
@@ -1843,7 +1843,7 @@ That expected `no` is part of the lesson: the identity has read-only access in t
 
 ## 21. Ingress
 
-Ingress is the main HTTP exposure strategy for the core tutorial because it is minikube-friendly and easy to enable with the ingress addon.
+Ingress is the main HTTP exposure strategy for the core tutorial because it works well with minikube and is straightforward to enable with the ingress addon.
 
 ```text
 request: Host=tutorial.local, Path=/genkey/... or /journal/...
