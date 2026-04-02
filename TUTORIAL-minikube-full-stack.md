@@ -783,7 +783,9 @@ A subtle but important point: the Deployment does not directly run containers. I
 ```bash
 kubectl delete pod -n tutorial echo-pod --ignore-not-found
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
+kubectl rollout status deployment/echo-deployment -n tutorial
 kubectl scale deployment/echo-deployment -n tutorial --replicas=3
+kubectl rollout status deployment/echo-deployment -n tutorial
 ```
 
 What you should observe:
@@ -807,7 +809,33 @@ echo-deployment-...                1/1     Running   0          ...
 echo-deployment-...                1/1     Running   0          ...
 ```
 
-This is the point where Kubernetes starts managing a desired replica count for you instead of just running a single unmanaged Pod.
+Because the Deployment reuses the label `app: echo`, the earlier `echo-service` Service can still target these new Pods. That is the important separation of concerns: the Service stays stable while the set of backend Pods changes underneath it.
+
+Test that by forwarding the same Service again:
+
+```bash
+kubectl port-forward -n tutorial service/echo-service 8080:80
+```
+
+Leave that port-forward running in one terminal. In another terminal:
+
+```bash
+curl http://127.0.0.1:8080
+```
+
+If you are using WSL, you can also open a Windows browser to:
+
+```text
+http://localhost:8080
+```
+
+Expected response:
+
+```text
+hello from echo-deployment
+```
+
+This is the point where Kubernetes starts managing a desired replica count for you instead of just running a single unmanaged Pod, while clients can keep using the same stable Service endpoint.
 
 ---
 
