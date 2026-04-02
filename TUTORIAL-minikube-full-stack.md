@@ -811,6 +811,10 @@ echo-deployment-...                1/1     Running   0          ...
 
 Because the Deployment reuses the label `app: echo`, the earlier `echo-service` Service can still target these new Pods. That is the important separation of concerns: the Service stays stable while the set of backend Pods changes underneath it.
 
+When there are multiple matching Pods, the Service does not "belong" to one specific Pod. Instead, it selects all Pods whose labels match the selector and sends each new connection to one of the healthy backends. From the client side, you still use one stable Service address; inside the cluster, Kubernetes distributes traffic across the matching replica set.
+
+In this example, that means `echo-service` can forward a request to any of the `echo-deployment` Pods created by the Deployment, not just the first one that started.
+
 Test that by forwarding the same Service again:
 
 ```bash
