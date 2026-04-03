@@ -640,20 +640,23 @@ Why these are grouped together:
 - the first command creates the Pod
 - the second waits until it is actually ready before you test it
 
-Test it from inside the cluster:
+### Small challenge
 
-```bash
-POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
-kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
-```
+In section 4.2.1, you already used a temporary helper Pod to access a running HTTP Pod from inside the cluster.
 
-Expected response:
+Before reading further, see if you can adapt that earlier two-command pattern yourself so it reaches **`echo-pod`** instead of **`simple-echo-pod`**.
 
-```text
-hello from echo-pod
-```
+Hints:
 
-That may not look dramatically different yet, but it sets up a better Deployment example later. When several Pods are created from the same template, each one can answer with its own Pod name.
+- you still need the Pod's internal IP address
+- you still need the helper Pod to `curl` that IP from inside the cluster
+- only a small part of the earlier command sequence needs to change
+
+If you want to try it on your own first, stop here for a moment.
+
+The answer appears at the start of the next section, so you can check your work there if needed.
+
+That little exercise is worth doing because it reinforces that Kubernetes is not doing anything magical yet. At this point, you are still reaching one specific Pod by its IP, just as before.
 
 Then clean up the standalone Pod before moving on:
 
@@ -683,6 +686,23 @@ spec:
     - port: 80
       targetPort: 5678
 ```
+
+### Answer to the section 4.2.2 challenge
+
+If you tried the challenge from the previous section, the adapted command sequence looks like this:
+
+```bash
+POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
+kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
+```
+
+Expected response:
+
+```text
+hello from echo-pod
+```
+
+If that worked, good — you have just confirmed that `echo-pod` is reachable from inside the cluster the same way the simpler Pod was.
 
 Recreate the Pod first:
 
