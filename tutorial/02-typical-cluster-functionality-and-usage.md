@@ -1,6 +1,6 @@
 # Part 2. Typical cluster functionality and usage
 
-## 4. Pods
+## 2.1 Pods
 
 A **pod** is the smallest deployable unit in Kubernetes.
 
@@ -18,7 +18,7 @@ In many beginner examples, a Pod runs just one container, so it is tempting to t
 
 That distinction becomes more important later, but it is worth naming now.
 
-### 4.1 Run a short-lived BusyBox pod
+### 2.2 Run a short-lived BusyBox pod
 
 This first Pod is meant to be temporary and easy to inspect.
 
@@ -97,7 +97,7 @@ Why delete it if it may already be finished?
 
 Because a finished Pod can still remain as a cluster object until you remove it. Deleting it keeps the tutorial environment tidy before moving on.
 
-### 4.2 Create long-running Pods from YAML
+### 2.3 Create long-running Pods from YAML
 
 The previous example created a short-lived Pod directly from the command line. This next section moves to a more typical Kubernetes workflow: define a Pod in YAML, apply it, and inspect the object Kubernetes creates.
 
@@ -108,7 +108,7 @@ To keep the learning curve reasonable, this section now uses **two Pod examples*
 
 The first keeps the YAML easy to read. The second sets up a more interesting response for the Service and Deployment sections that follow.
 
-### 4.2.1 Simple YAML Pod first
+### 2.4 Simple YAML Pod first
 
 Start with the simplest version.
 
@@ -193,7 +193,7 @@ kubectl delete pod simple-echo-pod
 
 That keeps the first example self-contained before introducing the richer Pod used later.
 
-### 4.2.2 A Pod that can identify itself
+### 2.5 A Pod that can identify itself
 
 Now switch to the Pod that the rest of the tutorial will use.
 
@@ -244,9 +244,9 @@ Why these are grouped together:
 - the first command creates the Pod
 - the second waits until it is actually ready before you test it
 
-### Small challenge
+### 2.6 Small challenge
 
-In section 4.2.1, you already used a temporary helper Pod to access a running HTTP Pod from inside the cluster.
+In section 2.4, you already used a temporary helper Pod to access a running HTTP Pod from inside the cluster.
 
 Before reading further, see if you can adapt that earlier two-command pattern yourself so it reaches **`echo-pod`** instead of **`simple-echo-pod`**.
 
@@ -270,7 +270,7 @@ kubectl delete pod echo-pod
 
 That cleanup is intentional because the next sections rebuild the same idea using Services and then Deployments.
 
-## 5. Services
+## 2.7 Services
 
 Pods are ephemeral. A **Service** gives a stable virtual IP and DNS name that can target one or more matching Pods.
 
@@ -291,7 +291,7 @@ spec:
       targetPort: 5678
 ```
 
-### Answer to the section 4.2.2 challenge
+### 2.8 Answer to the section 2.5 challenge
 
 If you tried the challenge from the previous section, the adapted command sequence looks like this:
 
@@ -357,7 +357,7 @@ hello from echo-pod
 
 That response now comes through the Service rather than from manually targeting the Pod IP.
 
-## 6. Kubernetes networking
+## 2.9 Kubernetes networking
 
 Kubernetes networking is built around a few expectations:
 
@@ -393,7 +393,7 @@ hello from echo-pod
 
 The important idea is that cluster-internal name resolution is now doing work for you.
 
-## 7. Namespaces
+## 2.10 Namespaces
 
 A **namespace** groups resources so you can separate environments and reduce clutter.
 
@@ -431,7 +431,7 @@ Why these steps are split up:
 - then you create objects inside it
 - finally you inspect only that namespace so the output stays focused on tutorial resources
 
-### 7.1 Contexts and changing the default namespace
+### 2.11 Contexts and changing the default namespace
 
 Check the current context information:
 
@@ -460,7 +460,7 @@ kubectl get svc
 
 At this point, those commands should use `tutorial` by default.
 
-### Small challenge
+### 2.12 Small challenge
 
 Before moving on, try this yourself:
 
@@ -473,7 +473,7 @@ Question to think about:
 
 If the result is not what you expected, look back at `kubectl config set-context --current --namespace=tutorial` and `kubectl config view --minify`.
 
-## 8. Labels
+## 2.13 Labels
 
 **Labels** are key/value pairs attached to objects. Kubernetes uses them heavily for selection.
 
@@ -495,7 +495,7 @@ Why this matters:
 - the second command shows how Kubernetes can use labels to find matching objects
 - later, Services and Deployments rely on this same idea
 
-### Small challenge
+### 2.14 Small challenge
 
 Try changing the selector yourself:
 
@@ -510,7 +510,7 @@ Question to think about:
 
 You can answer that by comparing the labels on the current Pod with the labels you will see later in the Deployment template.
 
-## 9. Deployments
+## 2.15 Deployments
 
 A **Deployment** manages rollout for a stateless application.
 
@@ -610,7 +610,7 @@ hello from echo-deployment-7d8c6c9f5b-ghi56
 
 The exact names will be different in your cluster, but the important point is that each response can come from a different replica.
 
-### Small challenge
+### 2.16 Small challenge
 
 Before you continue, try answering this by observation:
 
@@ -644,7 +644,7 @@ Question to think about:
 
 If you want a possible answer later, see the exercise solutions section at the end of the tutorial.
 
-## 10. ConfigMaps
+## 2.17 ConfigMaps
 
 A **ConfigMap** stores non-secret configuration data.
 
@@ -664,13 +664,13 @@ data:
 
 ConfigMaps are useful for small files, app settings, and simple tutorial content.
 
-## 11. Persistent Volumes and PersistentVolumeClaims
+## 2.18 Persistent Volumes and PersistentVolumeClaims
 
 A **PersistentVolumeClaim** requests durable storage for a workload.
 
 This is worth introducing as a core concept before the database examples, because it demonstrates a central Kubernetes idea: a Pod can go away while the storage survives.
 
-### 11.1 Simple persistence demo
+### 2.19 Simple persistence demo
 
 File: `config/01-pods/pvc-demo.yaml`
 
@@ -749,7 +749,7 @@ What this demonstrates:
 
 That is the core idea you will rely on later when SQL Server stores durable data.
 
-### 11.2 Why this matters later
+### 2.20 Why this matters later
 
 A PVC is a request, not the storage implementation itself. In minikube, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
 

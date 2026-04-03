@@ -1,6 +1,6 @@
 # Part 4. Advanced cluster usage
 
-## 18. Secrets
+## 4.1 Secrets
 
 A **Secret** stores sensitive values such as passwords, tokens, and connection strings.
 
@@ -20,7 +20,7 @@ stringData:
 
 We use Secrets in the journal examples for SQL Server credentials and connection strings.
 
-## 19. RBAC
+## 4.2 RBAC
 
 **RBAC** controls who can do what in Kubernetes.
 
@@ -73,7 +73,7 @@ kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutori
 
 The second command should print `no`.
 
-## 20. Advanced topics: Gateway and alternatives to Ingress
+## 4.3 Advanced topics: Gateway and alternatives to Ingress
 
 The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
 
@@ -88,7 +88,7 @@ Summary of options:
 - **Cilium Gateway API**
 - **Istio Gateway API support**
 
-### Recommendation
+### 4.4 Recommendation
 
 Keep the main tutorial on **Ingress**.
 
@@ -97,7 +97,7 @@ If you later want one advanced Gateway-focused extension, the best first options
 1. **NGINX Gateway Fabric**
 2. **Envoy Gateway**
 
-## 21. Reset script warning and safe use
+## 4.5 Reset script warning and safe use
 
 The reset helper exists to make repeated tutorial runs easier, but it is intentionally destructive.
 
@@ -115,13 +115,13 @@ The script now:
 
 That makes it safer to use on a workstation where you might have more than one Kubernetes context configured.
 
-## 22. Exercise notes and possible solutions
+## 4.6 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 22.1 Pod access challenge from section 4.2.2
+### 4.7 Pod access challenge from section 2.5
 
 Question:
 
@@ -140,7 +140,7 @@ Expected shape of response:
 hello from echo-pod
 ```
 
-### 22.2 Namespace default challenge from section 7.1
+### 4.8 Namespace default challenge from section 2.11
 
 Question:
 
@@ -152,7 +152,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 22.3 Label selector challenge from section 8
+### 4.9 Label selector challenge from section 2.13
 
 Question:
 
@@ -164,7 +164,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 22.4 Deployment observation challenge from section 9
+### 4.10 Deployment observation challenge from section 2.15
 
 Questions:
 
@@ -202,7 +202,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 22.5 Ingress route prediction challenge from section 17
+### 4.11 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -218,7 +218,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 23. What is already ready for polish later
+## 4.12 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 

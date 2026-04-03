@@ -1,6 +1,6 @@
 # Part 1. Installation and infrastructure
 
-## 2. Prerequisites
+## 1.1 Prerequisites
 
 Assume you are starting at a Linux shell prompt and you are not yet sure what is installed, what is configured, or whether minikube is already running. This section is written for that situation.
 
@@ -12,7 +12,7 @@ You should assume only that:
 
 If you already have some of these tools installed, the commands below are still useful because they help you verify what state the machine is in before you begin.
 
-### 2.1 Check what is already installed
+### 1.2 Check what is already installed
 
 Before installing anything, inspect the environment.
 
@@ -36,7 +36,7 @@ What this tells you:
 
 Some of these commands may fail if the tool is not installed yet. That is fine. At this stage, you are only checking what is already present before installing anything.
 
-### 2.2 Why this tutorial uses Docker as the minikube driver
+### 1.3 Why this tutorial uses Docker as the minikube driver
 
 Minikube can run on top of different drivers and container runtimes. In practice, these are the options people often encounter first when using Kubernetes locally:
 
@@ -56,7 +56,7 @@ Minikube can run on top of different drivers and container runtimes. In practice
 
 This tutorial chooses **Docker** because it is usually the least surprising route in a WSL setup.
 
-### 2.3 Why the Docker setup steps matter
+### 1.4 Why the Docker setup steps matter
 
 You will see these Docker-related steps below:
 
@@ -72,7 +72,7 @@ Why these steps are needed:
 - **add your user to the `docker` group** so you do not have to prefix every Docker command with `sudo`
 - **run `newgrp docker`** so your current shell notices the new group membership without forcing a full logout/login cycle
 
-### 2.4 Ubuntu packages
+### 1.5 Ubuntu packages
 
 Install the basic tools used throughout the tutorial:
 
@@ -96,7 +96,7 @@ docker --version
 docker ps
 ```
 
-### 2.5 openSUSE Leap packages
+### 1.6 openSUSE Leap packages
 
 Install the basic tools used throughout the tutorial:
 
@@ -121,7 +121,7 @@ docker --version
 docker ps
 ```
 
-### 2.6 Install kubectl
+### 1.7 Install kubectl
 
 `kubectl` is the command-line client for the Kubernetes API server.
 
@@ -132,7 +132,7 @@ sudo mv kubectl /usr/local/bin/
 kubectl version --client
 ```
 
-### 2.7 Install minikube
+### 1.8 Install minikube
 
 ```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
@@ -140,7 +140,7 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 minikube version
 ```
 
-### 2.8 Start and verify the cluster
+### 1.9 Start and verify the cluster
 
 Start minikube with Docker as the driver:
 
@@ -171,7 +171,7 @@ If the server address, certificates, or cluster state do not line up with the mi
 minikube update-context
 ```
 
-### 2.9 Enable ingress and metrics collection
+### 1.10 Enable ingress and metrics collection
 
 The tutorial uses two minikube addons early:
 
@@ -185,11 +185,11 @@ Why these addons are enabled:
 - **ingress** provides the nginx ingress controller used later in the tutorial
 - **metrics-server** provides resource-usage data for commands such as `kubectl top`
 
-## 3. Cluster infrastructure
+## 1.11 Cluster infrastructure
 
 This section groups together cluster-infrastructure topics that are important for administration, troubleshooting, and understanding how Kubernetes works internally.
 
-### 3.1 kube-apiserver
+### 1.12 kube-apiserver
 
 The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
 
@@ -216,7 +216,7 @@ What these commands show and why they matter:
 - `kubectl get nodes -o yaml | head -40`
   - shows live object data that the API server is serving back right now
 
-### 3.2 Nodes and kubelet
+### 1.13 Nodes and kubelet
 
 A **node** is a machine that Kubernetes can use to run work. In minikube, you usually have one node named `minikube`.
 
@@ -274,7 +274,7 @@ You do not need to memorize all of this output yet. For now, the important idea 
 1. **machine-level information** about the node
 2. **cluster-service information** about the internal components running on it
 
-### 3.3 etcd
+### 1.14 etcd
 
 **etcd** is the key-value store that holds cluster state. When you create a namespace, Secret, Deployment, or Service, the desired state is stored through the API server and backed by etcd.
 
@@ -305,7 +305,7 @@ What to notice:
 - etcd supports the cluster; it is not where your application database lives
 - in normal cluster use, you usually see etcd indirectly through the Kubernetes API
 
-### 3.4 metrics-server and `kubectl top`
+### 1.15 metrics-server and `kubectl top`
 
 The `metrics-server` addon collects resource-usage data from the cluster and makes it available through the Kubernetes metrics APIs.
 

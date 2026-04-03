@@ -1,6 +1,6 @@
 # Part 3. Cluster usage examples
 
-## 12. Static nginx web page using a ConfigMap
+## 3.1 Static nginx web page using a ConfigMap
 
 This is the first frontend pattern in the tutorial.
 
@@ -57,7 +57,7 @@ This stage is useful because it shows three layers working together:
 2. a Deployment runs nginx and mounts that content
 3. a Service gives you a stable way to reach the nginx Pod
 
-## 13. Basic Flask `/genkey` service behind nginx
+## 3.2 Basic Flask `/genkey` service behind nginx
 
 This stage introduces a reverse proxy and service-to-service routing.
 
@@ -126,7 +126,7 @@ Expected response shape:
 }
 ```
 
-### Important note about this example
+### 3.3 Important note about this example
 
 This is a convenient **teaching example** for:
 
@@ -143,7 +143,7 @@ If you later want a safer interactive Flask example, good alternatives would be:
 - hash or encoding demonstrations
 - simple text transformation APIs
 
-## 14. Richer frontend: built image instead of ConfigMap assets
+## 3.4 Richer frontend: built image instead of ConfigMap assets
 
 Now revisit frontend delivery with a better packaging model.
 
@@ -209,7 +209,7 @@ This stage matters because it shows the contrast between:
 
 For a richer frontend, the image-based approach is usually cleaner and more realistic.
 
-## 15. Journal application, first approach: schema init inside API startup
+## 3.5 Journal application, first approach: schema init inside API startup
 
 This first journal deployment uses the simplest developer-friendly pattern:
 
@@ -225,7 +225,7 @@ nginx web Pod  -- /journal/api -->  Service/journal-api  -->  C# API Pod
                                                           '-- startup schema creation --> Service/journal-db --> SQL Server Pod + PVC
 ```
 
-### Why show this approach first?
+### 3.6 Why show this approach first?
 
 Because it is understandable and practical:
 
@@ -233,11 +233,11 @@ Because it is understandable and practical:
 - the schema logic is visible in the application itself
 - easy to reason about as a first implementation
 
-### Important limitation
+### 3.7 Important limitation
 
 This approach is **not optimal** because the API runtime needs broader database privileges than it needs for normal request handling.
 
-### Apply the first-step manifests in phases
+### 3.8 Apply the first-step manifests in phases
 
 Build the journal API image:
 
@@ -316,7 +316,7 @@ Expected response:
 
 That `autoMigrate: true` value matters. It tells you the API is still doing schema work during startup.
 
-## 16. Journal application, improved approach: dedicated database-init Job
+## 3.9 Journal application, improved approach: dedicated database-init Job
 
 Now split schema initialization away from the API.
 
@@ -334,7 +334,7 @@ nginx web Pod  -- /journal/api -->  Service/journal-api  -->  C# API Pod
 (schema work is no longer part of normal API startup)
 ```
 
-### Why this approach is better
+### 3.10 Why this approach is better
 
 - clearer separation of concerns
 - easier to observe and debug independently
@@ -400,13 +400,13 @@ Expected response:
 
 That `autoMigrate: false` value matters. It tells you schema work has been moved out of the API startup path.
 
-## 17. Ingress in the application example
+## 3.11 Ingress in the application example
 
 Up to this point, you have used `kubectl port-forward` to reach Services. That is excellent for learning and debugging, but it is not how you usually want users to reach multiple HTTP applications.
 
 This is where **Ingress** helps.
 
-### Why Ingress is useful here
+### 3.12 Why Ingress is useful here
 
 The tutorial now has more than one HTTP-facing app:
 
@@ -463,7 +463,7 @@ Why this is split out:
 - the Ingress object defines routing rules
 - these extra commands discover how the ingress controller is actually reachable in your local minikube environment
 
-### Small challenge
+### 3.13 Small challenge
 
 Before you run the three `curl` commands below, look at the Ingress manifest and make a prediction:
 

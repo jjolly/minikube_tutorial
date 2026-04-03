@@ -11,7 +11,7 @@ The original material is organized into four parts:
 
 Use this file as the entry point, then open the module you want.
 
-## 0. What you are building and why
+## What you are building and why
 
 Minikube gives you a local Kubernetes cluster you can experiment with safely. On WSL, that means you can learn the Kubernetes object model and application deployment flow without renting cloud infrastructure first.
 
@@ -26,7 +26,7 @@ By the end, you will have:
 - a C# journal application backed by Microsoft SQL Server with persistent storage
 - an Ingress route exposing both `/genkey` and `/journal`
 
-## 1. Tutorial layout
+## Tutorial layout
 
 This section helps you find the files used by the tutorial while you work.
 
