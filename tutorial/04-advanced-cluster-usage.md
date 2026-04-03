@@ -285,13 +285,259 @@ Even when the surrounding environment changes, many of the core lessons in this 
 
 That is the most important thing to remember: minikube is not the end state for every Kubernetes user, but it is still a very good way to build the conceptual foundation.
 
-## 4.7 Exercise notes and possible solutions
+## 4.7 Ten minikube addons worth exploring
+
+Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, minikube addons are one of the easiest ways to keep experimenting.
+
+An addon is a prepackaged cluster feature that minikube knows how to enable and disable for you. They are useful because they let you try common Kubernetes components without manually installing every controller or supporting manifest yourself.
+
+A good first command to know is:
+
+```bash
+minikube addons list
+```
+
+And the basic pattern for using an addon is:
+
+```bash
+minikube addons enable <addon-name>
+minikube addons disable <addon-name>
+```
+
+Below is a practical "top 10" list of addons that are useful once the core tutorial is no longer brand new.
+
+### 4.8 ingress
+
+What it does:
+
+- installs the nginx ingress controller used for HTTP routing into cluster services
+
+Why it is useful:
+
+- lets you route multiple HTTP applications through one entrypoint
+- makes host/path-based routing experiments easy
+
+Basic use:
+
+```bash
+minikube addons enable ingress
+kubectl get pods -n ingress-nginx
+kubectl get ingress -A
+```
+
+### 4.9 metrics-server
+
+What it does:
+
+- provides resource-usage data used by the Kubernetes metrics APIs
+
+Why it is useful:
+
+- lets you use `kubectl top`
+- helps you see actual CPU and memory usage rather than only declared requests and limits
+
+Basic use:
+
+```bash
+minikube addons enable metrics-server
+kubectl top nodes
+kubectl top pods -A
+```
+
+### 4.10 dashboard
+
+What it does:
+
+- provides the Kubernetes Dashboard web UI
+
+Why it is useful:
+
+- gives you a visual way to browse workloads, namespaces, and object status
+- useful when you want a second view alongside `kubectl`
+
+Basic use:
+
+```bash
+minikube addons enable dashboard
+minikube dashboard
+```
+
+### 4.11 storage-provisioner
+
+What it does:
+
+- provides dynamic storage provisioning for local PersistentVolumeClaims in minikube
+
+Why it is useful:
+
+- makes PVC examples easier because storage can be provisioned automatically
+- helps demonstrate persistent storage concepts without setting up a separate storage system
+
+Basic use:
+
+```bash
+minikube addons enable storage-provisioner
+kubectl get storageclass
+kubectl get pvc -A
+```
+
+### 4.12 default-storageclass
+
+What it does:
+
+- marks a storage class as the default choice for PVCs that do not specify one explicitly
+
+Why it is useful:
+
+- makes storage examples simpler
+- helps you understand how Kubernetes picks a storage class when none is named
+
+Basic use:
+
+```bash
+minikube addons enable default-storageclass
+kubectl get storageclass
+```
+
+### 4.13 registry
+
+What it does:
+
+- provides an in-cluster container registry endpoint for image workflows
+
+Why it is useful:
+
+- lets you experiment with image push/pull flows without depending entirely on remote registries
+- useful when learning how clusters consume custom images
+
+Basic use:
+
+```bash
+minikube addons enable registry
+kubectl get svc -n kube-system
+```
+
+This one often benefits from reading the current minikube docs before deeper use, because local image workflow details can vary by driver and setup.
+
+### 4.14 registry-creds
+
+What it does:
+
+- helps configure registry credentials for pulling images from supported external registries
+
+Why it is useful:
+
+- useful when your experiments involve private images
+- shows how cluster image-pull behavior interacts with registry auth
+
+Basic use:
+
+```bash
+minikube addons enable registry-creds
+kubectl get pods -n kube-system
+```
+
+This addon is more interesting once you have a real registry workflow to test.
+
+### 4.15 volumesnapshots
+
+What it does:
+
+- enables snapshot-related Kubernetes resources used with compatible CSI storage drivers
+
+Why it is useful:
+
+- helps you explore more advanced storage ideas beyond "a PVC exists"
+- useful when you want to understand how storage backups and snapshots are modeled in Kubernetes
+
+Basic use:
+
+```bash
+minikube addons enable volumesnapshots
+kubectl api-resources | grep -i snapshot
+```
+
+### 4.16 csi-hostpath-driver
+
+What it does:
+
+- provides a CSI hostpath storage driver suitable for local testing and storage experiments
+
+Why it is useful:
+
+- lets you experiment with CSI-based storage behavior in a local lab
+- useful when you want to understand modern Kubernetes storage interfaces rather than only older in-tree behavior
+
+Basic use:
+
+```bash
+minikube addons enable csi-hostpath-driver
+kubectl get csidrivers
+kubectl get pods -A | grep csi || true
+```
+
+### 4.17 gvisor
+
+What it does:
+
+- enables the gVisor container sandbox runtime in supported environments
+
+Why it is useful:
+
+- gives you a way to experiment with stronger isolation tradeoffs
+- useful for learning that not all container runtime choices have the same security and performance profile
+
+Basic use:
+
+```bash
+minikube addons enable gvisor
+kubectl get runtimeclass
+```
+
+This is more advanced than the others because it leads into runtime-class and sandboxing topics.
+
+### 4.18 logviewer
+
+What it does:
+
+- provides a simple web UI for viewing logs from workloads in the cluster
+
+Why it is useful:
+
+- gives another way to inspect application behavior
+- can be a nice complement to `kubectl logs` during experimentation
+
+Basic use:
+
+```bash
+minikube addons enable logviewer
+minikube service logviewer -n kube-system
+```
+
+### 4.19 How to choose what to try next
+
+A good order of experimentation after the core tutorial would be:
+
+1. `metrics-server`
+2. `dashboard`
+3. `ingress`
+4. `storage-provisioner` and `default-storageclass`
+5. `registry` / `registry-creds`
+6. `volumesnapshots` / `csi-hostpath-driver`
+7. `gvisor`
+8. `logviewer`
+
+That order moves from low-friction observability features toward more advanced storage, runtime, and image-distribution topics.
+
+One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
+
+## 4.20 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.8 Pod access challenge from section 2.5
+### 4.21 Pod access challenge from section 2.5
 
 Question:
 
@@ -310,7 +556,7 @@ Expected shape of response:
 hello from echo-pod
 ```
 
-### 4.9 Namespace default challenge from section 2.11
+### 4.22 Namespace default challenge from section 2.11
 
 Question:
 
@@ -322,7 +568,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.10 Label selector challenge from section 2.13
+### 4.23 Label selector challenge from section 2.13
 
 Question:
 
@@ -334,7 +580,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.11 Deployment observation challenge from section 2.15
+### 4.24 Deployment observation challenge from section 2.15
 
 Questions:
 
@@ -372,7 +618,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.12 Ingress route prediction challenge from section 3.11
+### 4.25 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -388,7 +634,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 4.13 What is already ready for polish later
+## 4.26 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 
