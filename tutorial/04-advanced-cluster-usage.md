@@ -146,7 +146,7 @@ The main tutorial uses a single-node minikube cluster because that is the cleare
 
 This is still a local lab. The additional nodes are not separate physical machines in the way they might be in a cloud or data-center environment. But they are still useful because Kubernetes now has more than one node to choose from when placing workloads.
 
-### 4.7 Why try this in minikube?
+### 4.6.1 Why try this in minikube?
 
 A multi-node minikube cluster is useful when you want to see:
 
@@ -157,7 +157,7 @@ A multi-node minikube cluster is useful when you want to see:
 
 This belongs in the advanced part of the tutorial because the main walkthrough does not need multiple nodes. But once the basics are comfortable, multi-node behavior is worth seeing directly.
 
-### 4.8 Creating a multi-node minikube cluster
+### 4.6.2 Creating a multi-node minikube cluster
 
 A common way to do this is to create a new profile so you do not disturb your existing tutorial cluster.
 
@@ -185,7 +185,7 @@ If you want to remove this lab later:
 minikube delete -p multinode-lab
 ```
 
-### 4.9 What to observe once it is running
+### 4.6.3 What to observe once it is running
 
 Useful commands:
 
@@ -202,7 +202,7 @@ What to look for:
 
 The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
 
-### 4.10 A simple way to experience scheduling across nodes
+### 4.6.4 A simple way to experience scheduling across nodes
 
 One easy experiment is to create a Deployment with several replicas and then inspect where those replicas landed.
 
@@ -223,7 +223,7 @@ What to observe:
 
 This is one of the first moments where the abstract idea of "a cluster has multiple nodes" starts to feel concrete.
 
-### 4.11 Important limitations of this experience
+### 4.6.5 Important limitations of this experience
 
 It is still important to keep expectations realistic.
 
