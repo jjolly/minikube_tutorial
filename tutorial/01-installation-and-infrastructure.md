@@ -172,7 +172,7 @@ What you should observe:
 - `kubectl get nodes` should show a node named `minikube`
 - `kubectl cluster-info` should print API and service endpoints
 
-If one of these checks fails, or if `kubectl` later seems to be talking to the wrong cluster or a stale endpoint, use the troubleshooting guide in **Part 4, section 4.7** rather than trying to debug it piecemeal here.
+If one of these checks fails, or if `kubectl` later seems to be talking to the wrong cluster or a stale endpoint, use the troubleshooting guide in **Part 4, section 4.7**.
 
 ### 1.10 Enable ingress and metrics collection
 
