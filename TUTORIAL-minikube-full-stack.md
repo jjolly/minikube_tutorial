@@ -31,6 +31,11 @@ By the end, you will have:
 This section helps you find the files used by the tutorial while you work.
 
 ```text
+tutorial/
+  01-installation-and-infrastructure.md
+  02-typical-cluster-functionality-and-usage.md
+  03-cluster-usage-examples.md
+  04-advanced-cluster-usage.md
 src/
   02-nginx-static/
   03-genkey-basic/
@@ -45,21 +50,16 @@ config/
   advanced/
 scripts/
   reset-minikube-tutorial.sh
-tutorial/
-  01-installation-and-infrastructure.md
-  02-typical-cluster-functionality-and-usage.md
-  03-cluster-usage-examples.md
-  04-advanced-cluster-usage.md
 ```
 
 How to use this layout:
 
+- `tutorial/` contains the four tutorial modules.
 - `src/` contains application source code and Docker build inputs.
 - `config/` contains Kubernetes manifests used by the tutorial.
 - `config/05-journal/step1-startup-init/` contains the first database-init approach.
 - `config/05-journal/step2-job-init/` contains the improved database-init approach.
 - `scripts/reset-minikube-tutorial.sh` resets tutorial resources. It is intentionally destructive and requires explicit confirmation of the target context before proceeding.
-- `tutorial/` contains the four tutorial modules.
 
 ## Modules
 
