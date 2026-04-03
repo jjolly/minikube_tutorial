@@ -148,12 +148,6 @@ Use:
 minikube delete
 ```
 
-Or, if you want to be explicit about the profile:
-
-```bash
-minikube delete -p minikube
-```
-
 What this is for:
 
 - it removes the minikube cluster itself rather than only deleting tutorial workloads
