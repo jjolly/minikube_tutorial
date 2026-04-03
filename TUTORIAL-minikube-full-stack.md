@@ -456,6 +456,8 @@ What happens after you press Enter:
 5. the command sleeps for 15 seconds, giving you time to inspect the Pod
 6. the shell exits, so the Pod's main task is complete
 
+One subtle but important Kubernetes detail: when that short-lived command finishes, Kubernetes does not instantly forget the Pod. The Pod object usually remains in the cluster until you delete it, and Kubernetes records status information about how it finished. That means you can still inspect it after the 15-second sleep has ended and see that it ran and exited rather than simply vanishing.
+
 Read the Pod's logs:
 
 ```bash
@@ -477,8 +479,9 @@ What to look for:
 
 - if you run this while the `sleep 15` is still in progress, the Pod may show as `Running`
 - if you run it after the sleep ends, it may show as `Completed`
+- even in the `Completed` state, Kubernetes is still keeping the Pod object and its exit details around until you delete it
 
-That timing difference is useful. It shows that a Pod can exist for a short task, not only for long-running servers.
+That timing difference is useful. It shows that a Pod can exist for a short task, not only for long-running servers, and that Kubernetes keeps status information about the finished Pod for later inspection.
 
 Clean up the Pod:
 
