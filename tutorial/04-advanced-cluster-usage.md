@@ -200,7 +200,7 @@ But it does **not** automatically recreate all the realities of a larger environ
 
 So the value of this experiment is not "now I have production." The value is "now I can see Kubernetes making placement decisions across multiple nodes."
 
-## 4.5 Advanced topics: Gateway and alternatives to Ingress
+## 4.5 Gateway and alternatives to Ingress
 
 The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
 
