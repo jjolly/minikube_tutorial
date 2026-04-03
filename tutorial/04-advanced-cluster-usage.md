@@ -307,7 +307,11 @@ minikube addons disable <addon-name>
 Two important addons have already been used in this tutorial:
 
 - `ingress`
+  - enabled in **section 1.10**
+  - used more fully in the application routing walkthrough in **section 3.11**
 - `metrics-server`
+  - enabled in **section 1.10**
+  - explained and used with `kubectl top` in **section 1.15**
 
 Those were introduced earlier because they were needed for the main walkthrough. The list below focuses on **additional addons** you can experiment with after the core tutorial, while still keeping a practical top-10 set overall.
 
