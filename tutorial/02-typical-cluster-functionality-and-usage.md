@@ -644,7 +644,58 @@ Question to think about:
 
 If you want a possible answer later, see the exercise solutions section at the end of the tutorial.
 
-## 2.17 ConfigMaps
+## 2.17 Secrets
+
+A **Secret** stores sensitive values such as passwords, tokens, and connection strings.
+
+A useful first lesson is simply that Kubernetes treats secret data differently from ordinary configuration. You will use that idea later when the journal application needs database credentials.
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-secret
+  namespace: tutorial
+type: Opaque
+stringData:
+  username: demo
+  password: super-secret-value
+```
+
+Apply the Secret:
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-secret
+  namespace: tutorial
+type: Opaque
+stringData:
+  username: demo
+  password: super-secret-value
+EOF
+```
+
+Inspect what exists:
+
+```bash
+kubectl get secret example-secret -n tutorial
+kubectl describe secret example-secret -n tutorial
+```
+
+What to notice:
+
+- the Secret exists as a Kubernetes object, much like a ConfigMap does
+- Kubernetes knows the key names stored in it
+- but you should think of the values as sensitive data that should not be handled as casually as normal config
+
+This simple example is enough to make the journal database manifests later feel less surprising.
+
+## 2.18 ConfigMaps
 
 A **ConfigMap** stores non-secret configuration data.
 
@@ -664,13 +715,13 @@ data:
 
 ConfigMaps are useful for small files, app settings, and simple tutorial content.
 
-## 2.18 Persistent Volumes and PersistentVolumeClaims
+## 2.19 Persistent Volumes and PersistentVolumeClaims
 
 A **PersistentVolumeClaim** requests durable storage for a workload.
 
 This is worth introducing as a core concept before the database examples, because it demonstrates a central Kubernetes idea: a Pod can go away while the storage survives.
 
-### 2.19 Simple persistence demo
+### 2.20 Simple persistence demo
 
 File: `config/01-pods/pvc-demo.yaml`
 
@@ -749,7 +800,7 @@ What this demonstrates:
 
 That is the core idea you will rely on later when SQL Server stores durable data.
 
-### 2.20 Why this matters later
+### 2.21 Why this matters later
 
 A PVC is a request, not the storage implementation itself. In minikube, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
 

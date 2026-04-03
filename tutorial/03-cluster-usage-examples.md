@@ -251,6 +251,10 @@ Why start with the image build?
 
 Because the cluster cannot run the journal API Deployment until the image exists in minikube.
 
+Apply the Secret, PVC, database Deployment, and database Service first.
+
+The Secret concept itself was introduced earlier in **section 2.17**, so at this point the new thing is not "what is a Secret?" but rather how a Secret becomes part of an application deployment.
+
 Apply the Secret, PVC, database Deployment, and database Service first:
 
 ```bash
