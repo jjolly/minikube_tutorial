@@ -38,7 +38,7 @@ What this tells you:
 
 Some of these commands may fail if the tool is not installed yet. That is fine. At this stage, you are only checking what is already present before installing anything.
 
-If one of these setup or verification commands behaves unexpectedly and you want a more systematic way to diagnose the problem, see the troubleshooting guide in **Part 4, section 4.13**.
+If one of these setup or verification commands behaves unexpectedly and you want a more systematic way to diagnose the problem, see the troubleshooting guide in **Part 4, section 4.8**.
 
 ### 1.1.3 Why this tutorial uses Docker as the minikube driver
 
@@ -174,7 +174,7 @@ What you should observe:
 - `kubectl get nodes` should show a node named `minikube`
 - `kubectl cluster-info` should print API and service endpoints
 
-If one of these checks fails, or if `kubectl` later seems to be talking to the wrong cluster or a stale endpoint, use the troubleshooting guide in **Part 4, section 4.13**.
+If one of these checks fails, or if `kubectl` later seems to be talking to the wrong cluster or a stale endpoint, use the troubleshooting guide in **Part 4, section 4.8**.
 
 ### 1.1.10 Enable ingress and metrics collection
 
@@ -190,7 +190,7 @@ Why these addons are enabled:
 - **ingress** provides the nginx ingress controller used later in the tutorial
 - **metrics-server** provides resource-usage data for commands such as `kubectl top`
 
-If enabling addons fails or they do not appear healthy afterward, the troubleshooting guide in **Part 4, section 4.13** gives a structured way to inspect cluster status, system Pods, events, and addon-related failures.
+If enabling addons fails or they do not appear healthy afterward, the troubleshooting guide in **Part 4, section 4.8** gives a structured way to inspect cluster status, system Pods, events, and addon-related failures.
 
 ## 1.2 Infrastructure
 
