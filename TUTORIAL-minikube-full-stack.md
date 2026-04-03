@@ -492,6 +492,8 @@ Because a finished Pod can still remain as a cluster object until you remove it.
 
 ### 4.2 Create a long-running pod from YAML
 
+The previous example created a short-lived Pod directly from the command line. This next example moves to a more typical Kubernetes workflow: define the Pod in YAML, apply it, and inspect the object Kubernetes creates.
+
 File: `config/01-pods/pod-echo.yaml`
 
 ```yaml
@@ -511,19 +513,58 @@ spec:
         - containerPort: 5678
 ```
 
-Apply it:
+Apply the manifest:
 
 ```bash
 kubectl apply -f config/01-pods/pod-echo.yaml
+```
+
+What just happened:
+
+- Kubernetes received the Pod definition from the YAML file
+- it created a Pod object named `echo-pod`
+- the node then started a container from the `hashicorp/http-echo:1.0.0` image
+- that container runs a tiny HTTP server which replies with the text you supplied in `args`
+
+List the Pods:
+
+```bash
 kubectl get pods -o wide
+```
+
+Why this is a separate step:
+
+- it lets you see whether the Pod is still starting or already running
+- the `-o wide` output also shows extra details such as the Pod IP and the node it landed on
+
+Describe the Pod in detail:
+
+```bash
 kubectl describe pod echo-pod
 ```
 
-Test it from inside the cluster:
+Why this is useful:
+
+- `describe` gives much more detail than `get`
+- it is one of the first commands to use when a Pod does not behave the way you expect
+- the `Events` section near the bottom is especially useful for startup and scheduling problems
+
+Test the Pod from inside the cluster:
 
 ```bash
 POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
 kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
+```
+
+Why this is written as two commands:
+
+- the first command asks Kubernetes for the Pod's current internal IP address
+- the second command starts a temporary helper Pod and uses it to send an HTTP request to that IP from inside the cluster network
+
+Expected response:
+
+```text
+hello from echo-pod
 ```
 
 Then clean up the standalone Pod before moving on:
@@ -532,9 +573,13 @@ Then clean up the standalone Pod before moving on:
 kubectl delete pod echo-pod
 ```
 
+That cleanup is intentional because the next sections rebuild the same idea using Services and then Deployments.
+
 ## 5. Services
 
 Pods are ephemeral. A **Service** gives a stable virtual IP and DNS name that can target one or more matching Pods.
+
+This is one of the biggest practical differences between "a thing is running" and "other things can reliably find it." A Pod may disappear and come back with a different IP. A Service gives clients a steadier way to reach the backend.
 
 File: `config/01-pods/service-echo.yaml`
 
@@ -551,14 +596,40 @@ spec:
       targetPort: 5678
 ```
 
-Recreate the Pod, then create the Service:
+Recreate the Pod first:
 
 ```bash
 kubectl apply -f config/01-pods/pod-echo.yaml
 kubectl wait --for=condition=Ready pod/echo-pod --timeout=120s
+```
+
+Why these two commands are separate:
+
+- the first recreates the backend Pod that the Service will point at
+- the second waits until the Pod is actually ready, so you do not race ahead while it is still starting
+
+Create the Service:
+
+```bash
 kubectl apply -f config/01-pods/service-echo.yaml
+```
+
+What just happened:
+
+- Kubernetes created a Service named `echo-service`
+- that Service looks for Pods with the label `app: echo`
+- because `echo-pod` has that label, the Service can send traffic to it
+
+Forward the Service port to your local machine:
+
+```bash
 kubectl port-forward service/echo-service 8080:80
 ```
+
+Important timing note:
+
+- this command keeps running in the foreground
+- leave it open in that terminal while you test from a second terminal or browser
 
 In a second terminal:
 
@@ -571,6 +642,8 @@ Expected response:
 ```text
 hello from echo-pod
 ```
+
+That response now comes through the Service rather than from manually targeting the Pod IP.
 
 ## 6. Kubernetes networking
 
@@ -585,17 +658,28 @@ Pod A  --DNS lookup-->  Service name
                       backend Pod
 ```
 
-Test from a temporary shell pod:
+This section demonstrates the idea that workloads inside the cluster usually talk to each other through Service names, not by discovering individual Pod IP addresses by hand.
+
+Start a temporary helper Pod and test DNS plus HTTP in one shot:
 
 ```bash
 kubectl run netshoot --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc 'nslookup echo-service && curl -fsS http://echo-service'
 ```
+
+What this command is doing:
+
+- it creates a temporary Pod from the `nicolaka/netshoot` image
+- inside that Pod, it first asks cluster DNS to resolve `echo-service`
+- then it uses `curl` to send an HTTP request to the Service by name
+- `--rm` removes the helper Pod when the command finishes
 
 Expected response:
 
 ```text
 hello from echo-pod
 ```
+
+The important idea is that cluster-internal name resolution is now doing work for you.
 
 ## 7. Namespaces
 
@@ -610,37 +694,87 @@ metadata:
   name: tutorial
 ```
 
-Create the namespace and move the echo resources into it:
+Create the namespace:
 
 ```bash
 kubectl apply -f config/01-pods/namespace-tutorial.yaml
+```
+
+Move the echo resources into it:
+
+```bash
 kubectl apply -n tutorial -f config/01-pods/pod-echo.yaml
 kubectl apply -n tutorial -f config/01-pods/service-echo.yaml
+```
+
+Inspect what now exists in that namespace:
+
+```bash
 kubectl get all -n tutorial
 ```
 
+Why these steps are split up:
+
+- first you create the namespace itself
+- then you create objects inside it
+- finally you inspect only that namespace so the output stays focused on tutorial resources
+
 ### 7.1 Contexts and changing the default namespace
+
+Check the current context information:
 
 ```bash
 kubectl config current-context
 kubectl config view --minify
+```
+
+What these commands show:
+
+- the first prints the name of the currently selected kubeconfig context
+- the second shows the currently active cluster, user, and namespace settings in a smaller view
+
+Set the current context to default to the `tutorial` namespace:
+
+```bash
 kubectl config set-context --current --namespace=tutorial
+```
+
+Verify the effect:
+
+```bash
 kubectl get pods
 kubectl get svc
 ```
+
+At this point, those commands should use `tutorial` by default.
 
 ## 8. Labels
 
 **Labels** are key/value pairs attached to objects. Kubernetes uses them heavily for selection.
 
+Show Pod labels directly:
+
 ```bash
 kubectl get pods -n tutorial --show-labels
+```
+
+Filter by one specific label:
+
+```bash
 kubectl get pods -n tutorial -l app=echo
 ```
+
+Why this matters:
+
+- the first command shows which labels are present
+- the second command shows how Kubernetes can use labels to find matching objects
+- later, Services and Deployments rely on this same idea
 
 ## 9. Deployments
 
 A **Deployment** manages rollout for a stateless application.
+
+A standalone Pod is useful for learning, but it is not the usual way to keep an application running. A Deployment describes the desired state for a replaceable set of Pods and lets Kubernetes maintain that state for you.
 
 File: `config/01-pods/deployment-echo.yaml`
 
@@ -672,14 +806,43 @@ spec:
             - containerPort: 5678
 ```
 
-Apply it:
+Remove the earlier standalone Pod:
 
 ```bash
 kubectl delete pod -n tutorial echo-pod --ignore-not-found
+```
+
+Why do this first?
+
+Because the goal now is to let the Deployment manage the backend Pods instead of leaving the original manually created Pod around.
+
+Apply the Deployment and wait for rollout:
+
+```bash
 kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
 kubectl rollout status deployment/echo-deployment -n tutorial
+```
+
+What these commands do:
+
+- the first creates the Deployment object
+- the second waits while Kubernetes creates the managed Pods and reports when the rollout is complete
+
+Scale the Deployment to three replicas:
+
+```bash
 kubectl scale deployment/echo-deployment -n tutorial --replicas=3
 kubectl rollout status deployment/echo-deployment -n tutorial
+```
+
+Why these are separate again:
+
+- `scale` changes the desired number of replicas
+- `rollout status` lets you watch Kubernetes converge toward that new desired state
+
+Inspect the resulting Pods:
+
+```bash
 kubectl get pods -n tutorial -o wide
 ```
 
@@ -820,10 +983,28 @@ ConfigMap (index.html)
 
 File: `config/02-static-nginx/static-site.yaml`
 
+Apply the manifest:
+
 ```bash
 kubectl apply -f config/02-static-nginx/static-site.yaml
+```
+
+What this single file creates:
+
+- a ConfigMap containing the HTML page
+- a Deployment running nginx
+- a Service exposing that nginx Pod inside the cluster
+
+Port-forward the Service:
+
+```bash
 kubectl port-forward -n tutorial service/static-nginx 8080:80
 ```
+
+Important timing note:
+
+- like other `port-forward` commands in the tutorial, this one stays attached to the current terminal
+- leave it running while you test from another terminal or browser
 
 In another terminal:
 
@@ -867,10 +1048,27 @@ minikube image build -t genkey-basic-api:0.1.0 .
 cd ../..
 ```
 
-Deploy it:
+Why this is written as a small sequence:
+
+- first you move into the directory that contains the Docker build context
+- then `minikube image build` builds the image directly into minikube's image store
+- finally you return to the repository root so later commands match the file paths shown in the tutorial
+
+Apply the Kubernetes manifests:
 
 ```bash
 kubectl apply -f config/03-genkey-basic/genkey-basic.yaml
+```
+
+What this creates:
+
+- a ConfigMap for nginx configuration
+- a Deployment and Service for the Flask API
+- a Deployment and Service for the nginx reverse proxy
+
+Port-forward the proxy Service:
+
+```bash
 kubectl port-forward -n tutorial service/genkey-basic-proxy 8081:80
 ```
 
@@ -922,20 +1120,36 @@ nginx frontend Pod  -- /genkey/api -->  Service/genkey-api  -->  Flask API Pod
   '-- /genkey/ --> serves built React frontend files
 ```
 
-Build the backend and frontend images:
+Build the backend image first:
 
 ```bash
 cd src/04-genkey-full/backend
 minikube image build -t genkey-api:0.1.0 .
+```
+
+Then build the frontend image:
+
+```bash
 cd ..
 minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
 cd ../..
 ```
 
+Why the build is split in two:
+
+- the backend and frontend are packaged separately
+- each image has its own build context and purpose
+- keeping the commands separate makes it clearer which artifact you are building at each step
+
 Apply the manifests:
 
 ```bash
 kubectl apply -f config/04-genkey-full/image-based/
+```
+
+Port-forward the frontend Service:
+
+```bash
 kubectl port-forward -n tutorial service/genkey-web 8082:80
 ```
 
@@ -994,6 +1208,10 @@ minikube image build -t journal-api:0.1.0 .
 cd ../../..
 ```
 
+Why start with the image build?
+
+Because the cluster cannot run the journal API Deployment until the image exists in minikube.
+
 Apply the Secret, PVC, database Deployment, and database Service first:
 
 ```bash
@@ -1003,12 +1221,24 @@ kubectl apply -f config/05-journal/step1-startup-init/02-db-deployment.yaml
 kubectl apply -f config/05-journal/step1-startup-init/03-db-service.yaml
 ```
 
+Why these are grouped together:
+
+- the Secret provides the database credentials
+- the PVC provides durable storage
+- the database Deployment starts SQL Server
+- the database Service gives SQL Server a stable in-cluster name
+
 Wait for SQL Server:
 
 ```bash
 kubectl get pods -n tutorial -w
 kubectl rollout status deployment/journal-db -n tutorial
 ```
+
+Why two monitoring commands?
+
+- `kubectl get pods -w` gives you a live stream of Pod state changes
+- `kubectl rollout status` gives you a cleaner Deployment-level success signal
 
 Then apply the API and web resources:
 
@@ -1021,7 +1251,13 @@ kubectl apply -f config/05-journal/step1-startup-init/08-web-deployment.yaml
 kubectl apply -f config/05-journal/step1-startup-init/09-web-service.yaml
 ```
 
-Check health:
+What this second phase adds:
+
+- the API Deployment and Service
+- the frontend assets and nginx configuration
+- the web Deployment and Service
+
+Check health by forwarding the API locally:
 
 ```bash
 kubectl port-forward -n tutorial service/journal-api 8084:8080
@@ -1072,14 +1308,38 @@ If you already ran the startup-init version, remove it before applying the impro
 kubectl delete -f config/05-journal/step1-startup-init/
 ```
 
+This cleanup matters because the improved version recreates some of the same application pieces with a different initialization strategy.
+
 Apply the improved manifests:
 
 ```bash
 kubectl apply -f config/05-journal/step2-job-init/
+```
+
+Inspect the live state:
+
+```bash
 kubectl get pods,jobs -n tutorial
+```
+
+Wait for the one-time initialization Job to finish:
+
+```bash
 kubectl wait --for=condition=complete job/journal-db-init -n tutorial --timeout=600s
+```
+
+Read the Job logs:
+
+```bash
 kubectl logs -n tutorial job/journal-db-init
 ```
+
+Why these are separate steps:
+
+- `apply` creates everything
+- `get pods,jobs` shows you what exists right now
+- `wait` blocks until the one-time schema setup finishes or times out
+- `logs` lets you see what the Job actually did
 
 Then check the API health:
 
@@ -1138,10 +1398,15 @@ There are many ways to expose Kubernetes applications. In this tutorial, Ingress
 
 File: `config/05-journal/13-ingress.yaml`
 
-Apply it:
+Apply the Ingress object:
 
 ```bash
 kubectl apply -f config/05-journal/13-ingress.yaml
+```
+
+Inspect it:
+
+```bash
 kubectl get ingress -n tutorial
 ```
 
@@ -1153,6 +1418,11 @@ NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath
 echo "$MINIKUBE_IP"
 echo "$NODEPORT"
 ```
+
+Why this is split out:
+
+- the Ingress object defines routing rules
+- these extra commands discover how the ingress controller is actually reachable in your local minikube environment
 
 Test the routes with the expected host header:
 
