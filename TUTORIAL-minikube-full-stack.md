@@ -294,7 +294,11 @@ What these commands show and why they matter:
 
 ### 3.2 Nodes and kubelet
 
-A **node** is a machine that runs workloads. In minikube, you typically have one node. The **kubelet** is the agent on that node that makes sure the assigned containers actually run.
+A **node** is a machine that Kubernetes can use to run work. In minikube, you usually have one node named `minikube`.
+
+The **kubelet** is the Kubernetes agent running on that node. Its job is to make sure the things Kubernetes asked to run on that machine are actually started and kept in the expected state.
+
+At this point in the tutorial, some of the terminology in the command output may still be new. That is okay. The goal here is to start recognizing what the cluster reports about itself. Later sections will explain these ideas in more detail when you begin creating and managing your own application objects.
 
 ```bash
 kubectl get nodes -o wide
@@ -302,11 +306,49 @@ kubectl describe node minikube
 kubectl get pods -n kube-system -o wide
 ```
 
-What to notice:
+What these commands are showing:
 
-- the node is the machine-level execution target
-- the kubelet is the node-local agent that keeps Pod state in sync
+- `kubectl get nodes -o wide`
+  - lists the machines Kubernetes currently knows about
+  - in this tutorial, that is usually just one row for `minikube`
+  - the `-o wide` form adds extra columns such as internal IP address, operating system, kernel version, and container runtime
+- `kubectl describe node minikube`
+  - prints a much more detailed report about that one node
+  - useful for seeing labels, resource capacity, health conditions, and recent node-related events
+- `kubectl get pods -n kube-system -o wide`
+  - lists the cluster's own supporting components that are running in the `kube-system` namespace
+  - this is useful because it shows that Kubernetes is not just managing your future applications; it is also running internal cluster services
+
+Brief terminology guide for this section:
+
+- **node**
+  - a machine Kubernetes can run things on
+  - in minikube, this is usually the single cluster machine
+- **Pod**
+  - a running unit of work in Kubernetes
+  - Pods are explained properly later; for now, think of them as the basic things Kubernetes starts and manages
+- **namespace**
+  - a way Kubernetes groups related objects
+  - `kube-system` is the namespace commonly used for built-in cluster components
+- **container runtime**
+  - the software on the node that actually runs containers
+  - in this tutorial, that is typically Docker through minikube's setup
+- **conditions**
+  - status checks Kubernetes records about a node, such as whether it is ready to run work
+- **events**
+  - recent messages Kubernetes recorded about something that happened, such as successful startup or a failure
+
+What to notice on a first read:
+
+- the node is the machine-level execution target for the cluster
+- the kubelet is the node-local agent responsible for keeping that machine aligned with Kubernetes expectations
+- `kubectl describe node` gives a much richer operational view than `kubectl get nodes`
 - the `kube-system` namespace shows that the cluster itself runs supporting Pods too
+
+You do not need to memorize all of this output yet. For now, the important idea is simply that Kubernetes can report both:
+
+1. **machine-level information** about the node
+2. **cluster-service information** about the internal components running on it
 
 ### 3.3 etcd
 
