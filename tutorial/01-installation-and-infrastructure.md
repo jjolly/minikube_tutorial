@@ -190,11 +190,7 @@ Why these addons are enabled:
 
 If enabling addons fails or they do not appear healthy afterward, the troubleshooting guide in **Part 4, section 4.7** gives a structured way to inspect cluster status, system Pods, events, and addon-related failures.
 
-## 1.11 Cluster infrastructure
-
-This section groups together cluster-infrastructure topics that are important for administration, troubleshooting, and understanding how Kubernetes works internally.
-
-### 1.12 kube-apiserver
+## 1.11 kube-apiserver
 
 The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
 
@@ -221,7 +217,7 @@ What these commands show and why they matter:
 - `kubectl get nodes -o yaml | head -40`
   - shows live object data that the API server is serving back right now
 
-### 1.13 Nodes and kubelet
+## 1.12 Nodes and kubelet
 
 A **node** is a machine that Kubernetes can use to run work. In minikube, you usually have one node named `minikube`.
 
@@ -279,7 +275,7 @@ You do not need to memorize all of this output yet. For now, the important idea 
 1. **machine-level information** about the node
 2. **cluster-service information** about the internal components running on it
 
-### 1.14 etcd
+## 1.13 etcd
 
 **etcd** is the key-value store that holds cluster state. When you create a namespace, Secret, Deployment, or Service, the desired state is stored through the API server and backed by etcd.
 
@@ -310,7 +306,7 @@ What to notice:
 - etcd supports the cluster; it is not where your application database lives
 - in normal cluster use, you usually see etcd indirectly through the Kubernetes API
 
-### 1.15 metrics-server and `kubectl top`
+## 1.14 metrics-server and `kubectl top`
 
 The `metrics-server` addon collects resource-usage data from the cluster and makes it available through the Kubernetes metrics APIs.
 
