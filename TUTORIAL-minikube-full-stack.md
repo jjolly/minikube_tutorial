@@ -37,6 +37,7 @@ tutorial/
   03-cluster-usage-examples.md
   04-advanced-cluster-usage.md
 src/
+  01-pods/
   02-nginx-static/
   03-genkey-basic/
   04-genkey-full/
@@ -55,8 +56,10 @@ scripts/
 How to use this layout:
 
 - `tutorial/` contains the four tutorial modules.
-- `src/` contains application source code and Docker build inputs.
+- `src/` contains application source code and other source-stage materials used by the examples.
 - `config/` contains Kubernetes manifests used by the tutorial.
+- the `01-` / `02-` / `03-` numbering in `src/` and `config/` represents **tutorial stage order**, not part number.
+- `src/01-pods/` is present as a placeholder/explanation stage because the earliest examples use stock public images rather than custom application source code.
 - `config/05-journal/step1-startup-init/` contains the first database-init approach.
 - `config/05-journal/step2-job-init/` contains the improved database-init approach.
 - `scripts/reset-minikube-tutorial.sh` resets tutorial resources. It is intentionally destructive and requires explicit confirmation of the target context before proceeding.
