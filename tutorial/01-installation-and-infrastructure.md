@@ -283,6 +283,32 @@ Why this matters:
 - it helps connect the idea of "Kubernetes objects" to the actual data the API server stores and returns
 - later in the tutorial, you will create your own objects and inspect them in the same way
 
+It is also worth noticing that full YAML output can become very large very quickly. `kubectl` has built-in output filtering options that let you pull out just the fields you care about.
+
+For example, if you only want the node names:
+
+```bash
+kubectl get nodes -o jsonpath='{.items[*].metadata.name}'
+```
+
+If you want each node name on its own line:
+
+```bash
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+```
+
+If you want to see just the node names and their internal IP addresses:
+
+```bash
+kubectl get nodes -o custom-columns=NAME:.metadata.name,INTERNAL_IP:.status.addresses[0].address
+```
+
+Why this is useful:
+
+- you do not always need the entire YAML document
+- targeted output is much easier to read when objects become large
+- later, techniques like `jsonpath` are very helpful when you want one specific value from a Kubernetes object without scanning pages of output
+
 ### 1.2.2 Nodes and kubelet
 
 A **node** is a machine that Kubernetes can use to run work. In minikube, you usually have one node named `minikube`.
