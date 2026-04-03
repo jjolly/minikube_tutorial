@@ -285,7 +285,240 @@ Even when the surrounding environment changes, many of the core lessons in this 
 
 That is the most important thing to remember: minikube is not the end state for every Kubernetes user, but it is still a very good way to build the conceptual foundation.
 
-## 4.7 Ten minikube addons worth exploring
+## 4.7 Cluster troubleshooting: what to check and which tools to use
+
+When a cluster is not behaving the way you expected, it helps to think in layers instead of guessing randomly.
+
+A useful troubleshooting order is:
+
+1. **is the cluster running at all?**
+2. **is `kubectl` talking to the cluster you think it is?**
+3. **are the node and core system Pods healthy?**
+4. **did your workload start, schedule, and become ready?**
+5. **is networking or storage the actual problem?**
+
+The goal of this section is not to turn you into a production SRE in one step. It is to give you a practical toolkit for diagnosing common minikube and Kubernetes problems.
+
+### 4.8 First checks: cluster status and context
+
+Start with the broadest questions first.
+
+Useful commands:
+
+```bash
+minikube status
+kubectl config current-context
+kubectl cluster-info
+kubectl get nodes -o wide
+```
+
+What they help you answer:
+
+- `minikube status`
+  - is the minikube cluster actually running?
+- `kubectl config current-context`
+  - is `kubectl` pointing at the context you think it is?
+- `kubectl cluster-info`
+  - can `kubectl` reach the cluster control plane?
+- `kubectl get nodes -o wide`
+  - is the node visible and reported as `Ready`?
+
+Common problems these help catch:
+
+- minikube is stopped
+- `kubectl` is pointing at the wrong cluster
+- the node is not ready
+- the API server is not reachable from your shell
+
+If the context appears stale after recreating a cluster, a useful repair command is:
+
+```bash
+minikube update-context
+```
+
+### 4.9 Inspect the node and system components
+
+If the cluster exists but still seems unhealthy, check the node and the core supporting Pods.
+
+Useful commands:
+
+```bash
+kubectl describe node minikube
+kubectl get pods -n kube-system -o wide
+kubectl get events -A --sort-by=.lastTimestamp
+```
+
+What to look for:
+
+- node conditions that are not healthy
+- core Pods in `CrashLoopBackOff`, `ImagePullBackOff`, `Pending`, or repeated restart states
+- recent warning events that mention scheduling, image pulls, probes, or storage issues
+
+This is often where addon failures or cluster-level issues first become visible.
+
+### 4.10 Diagnose a Pod that did not start correctly
+
+If your workload exists but is not healthy, inspect the Pod directly.
+
+Useful commands:
+
+```bash
+kubectl get pods -A
+kubectl describe pod <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace>
+```
+
+If the Pod has more than one container, you may need:
+
+```bash
+kubectl logs <pod-name> -n <namespace> -c <container-name>
+```
+
+What these commands help you answer:
+
+- is the Pod `Pending`, `Running`, `CrashLoopBackOff`, `ImagePullBackOff`, or `Completed`?
+- did the scheduler place it on a node?
+- did image pulling fail?
+- did readiness or liveness probes fail?
+- did the application itself start and then crash?
+
+A good beginner habit is:
+
+- use `get` for the high-level state
+- use `describe` for Kubernetes' explanation of what happened
+- use `logs` for the application's own output
+
+### 4.11 Diagnose Deployment rollout problems
+
+Deployments add another layer because Kubernetes is trying to maintain a desired number of Pods for you.
+
+Useful commands:
+
+```bash
+kubectl get deployment -A
+kubectl describe deployment <deployment-name> -n <namespace>
+kubectl rollout status deployment/<deployment-name> -n <namespace>
+kubectl get pods -n <namespace> -l app=<label>
+```
+
+What these help you answer:
+
+- did the Deployment create a ReplicaSet?
+- did the expected number of Pods appear?
+- are the Pods stuck starting or failing health checks?
+- does the selector actually match the Pods you expected it to manage?
+
+This is especially useful when a Deployment exists but the application still does not seem reachable.
+
+### 4.12 Diagnose Service and networking problems
+
+If the Pods are healthy but traffic is not getting through, shift from workload troubleshooting to networking troubleshooting.
+
+Useful commands:
+
+```bash
+kubectl get svc -A
+kubectl describe svc <service-name> -n <namespace>
+kubectl get endpoints -n <namespace> <service-name>
+kubectl run netshoot --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh
+```
+
+What these help you answer:
+
+- does the Service exist?
+- does its selector match real Pods?
+- does it have endpoints?
+- can another Pod reach the Service by DNS name or IP?
+
+Typical failure patterns:
+
+- the Service selector does not match the Pod labels
+- the Pods are not ready, so the Service has no usable endpoints
+- the application is listening on a different port than the Service expects
+- DNS or path assumptions are wrong
+
+### 4.13 Diagnose Ingress and HTTP routing problems
+
+If the Services work but HTTP routing still fails, inspect the ingress layer.
+
+Useful commands:
+
+```bash
+kubectl get ingress -A
+kubectl describe ingress <ingress-name> -n <namespace>
+kubectl get svc -n ingress-nginx
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller --tail=100
+```
+
+What these help you answer:
+
+- does the Ingress object exist with the rules you expected?
+- is the ingress controller running?
+- are you reaching the correct exposed port/path in minikube?
+- is the controller reporting routing or backend errors?
+
+A common beginner mistake is assuming an Ingress YAML problem when the real issue is that traffic is reaching the wrong port or host header.
+
+### 4.14 Diagnose storage and PVC problems
+
+When storage is involved, check both the claim and the workload using it.
+
+Useful commands:
+
+```bash
+kubectl get pvc -A
+kubectl describe pvc <claim-name> -n <namespace>
+kubectl get storageclass
+kubectl describe pod <pod-name> -n <namespace>
+```
+
+What these help you answer:
+
+- is the PVC still `Pending`, or has it bound successfully?
+- is there a default storage class?
+- is the Pod failing because the volume could not be mounted?
+- does the claim request match what the cluster can provide?
+
+This matters because sometimes a Pod looks broken when the real failure is that its storage never became available.
+
+### 4.15 High-value troubleshooting commands to remember
+
+If you only remember a short list, remember these:
+
+```bash
+minikube status
+kubectl config current-context
+kubectl get nodes -o wide
+kubectl get pods -A
+kubectl describe pod <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace>
+kubectl get svc -A
+kubectl get endpoints -A
+kubectl get ingress -A
+kubectl get pvc -A
+kubectl get events -A --sort-by=.lastTimestamp
+```
+
+These commands cover a surprisingly large percentage of beginner and intermediate cluster problems.
+
+### 4.16 Troubleshooting mindset
+
+A few habits will save you time:
+
+- do not start by changing random YAML fields
+- confirm the cluster and context first
+- read `describe` output instead of guessing
+- check events when something feels mysterious
+- isolate whether the problem is cluster-level, workload-level, network-level, or storage-level
+- change one thing at a time when testing a fix
+
+For local clusters especially, it is also fair to ask a very practical question:
+
+- would it be faster and clearer to reset the cluster with `minikube delete` and restart from section `1.9`?
+
+Sometimes the answer is yes, especially in a learning environment.
+
+## 4.17 Ten minikube addons worth exploring
 
 Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, minikube addons are one of the easiest ways to keep experimenting.
 
@@ -315,7 +548,7 @@ Two important addons have already been used in this tutorial:
 
 Those were introduced earlier because they were needed for the main walkthrough. The list below focuses on **additional addons** you can experiment with after the core tutorial, while still keeping a practical top-10 set overall.
 
-### 4.8 dashboard
+### 4.18 dashboard
 
 What it does:
 
@@ -333,7 +566,7 @@ minikube addons enable dashboard
 minikube dashboard
 ```
 
-### 4.9 storage-provisioner
+### 4.19 storage-provisioner
 
 What it does:
 
@@ -352,7 +585,7 @@ kubectl get storageclass
 kubectl get pvc -A
 ```
 
-### 4.10 default-storageclass
+### 4.20 default-storageclass
 
 What it does:
 
@@ -370,7 +603,7 @@ minikube addons enable default-storageclass
 kubectl get storageclass
 ```
 
-### 4.11 registry
+### 4.21 registry
 
 What it does:
 
@@ -390,7 +623,7 @@ kubectl get svc -n kube-system
 
 This one often benefits from reading the current minikube docs before deeper use, because local image workflow details can vary by driver and setup.
 
-### 4.12 registry-creds
+### 4.22 registry-creds
 
 What it does:
 
@@ -410,7 +643,7 @@ kubectl get pods -n kube-system
 
 This addon is more interesting once you have a real registry workflow to test.
 
-### 4.13 volumesnapshots
+### 4.23 volumesnapshots
 
 What it does:
 
@@ -428,7 +661,7 @@ minikube addons enable volumesnapshots
 kubectl api-resources | grep -i snapshot
 ```
 
-### 4.14 csi-hostpath-driver
+### 4.24 csi-hostpath-driver
 
 What it does:
 
@@ -447,7 +680,7 @@ kubectl get csidrivers
 kubectl get pods -A | grep csi || true
 ```
 
-### 4.15 gvisor
+### 4.25 gvisor
 
 What it does:
 
@@ -467,7 +700,7 @@ kubectl get runtimeclass
 
 This is more advanced than the others because it leads into runtime-class and sandboxing topics.
 
-### 4.16 logviewer
+### 4.26 logviewer
 
 What it does:
 
@@ -485,7 +718,7 @@ minikube addons enable logviewer
 minikube service logviewer -n kube-system
 ```
 
-### 4.17 metallb
+### 4.27 metallb
 
 What it does:
 
@@ -505,7 +738,7 @@ kubectl get pods -n metallb-system
 
 This addon becomes more interesting when you start experimenting with `Service` objects of type `LoadBalancer`.
 
-### 4.18 How to choose what to try next
+### 4.28 How to choose what to try next
 
 A good order of experimentation after the core tutorial would be:
 
@@ -521,13 +754,13 @@ That order moves from low-friction visibility and storage features toward more a
 
 One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
 
-## 4.19 Exercise notes and possible solutions
+## 4.29 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.20 Pod access challenge from section 2.5
+### 4.30 Pod access challenge from section 2.5
 
 Question:
 
@@ -546,7 +779,7 @@ Expected shape of response:
 hello from echo-pod
 ```
 
-### 4.21 Namespace default challenge from section 2.11
+### 4.31 Namespace default challenge from section 2.11
 
 Question:
 
@@ -558,7 +791,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.22 Label selector challenge from section 2.13
+### 4.32 Label selector challenge from section 2.13
 
 Question:
 
@@ -570,7 +803,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.23 Deployment observation challenge from section 2.15
+### 4.33 Deployment observation challenge from section 2.15
 
 Questions:
 
@@ -608,7 +841,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.24 Ingress route prediction challenge from section 3.11
+### 4.34 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -624,7 +857,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 4.25 What is already ready for polish later
+## 4.35 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 

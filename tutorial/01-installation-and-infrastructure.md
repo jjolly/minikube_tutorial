@@ -36,6 +36,8 @@ What this tells you:
 
 Some of these commands may fail if the tool is not installed yet. That is fine. At this stage, you are only checking what is already present before installing anything.
 
+If one of these setup or verification commands behaves unexpectedly and you want a more systematic way to diagnose the problem, see the troubleshooting guide in **Part 4, section 4.7**.
+
 ### 1.3 Why this tutorial uses Docker as the minikube driver
 
 Minikube can run on top of different drivers and container runtimes. In practice, these are the options people often encounter first when using Kubernetes locally:
@@ -170,6 +172,8 @@ What you should observe:
 - `kubectl get nodes` should show a node named `minikube`
 - `kubectl cluster-info` should print API and service endpoints
 
+If one of these checks fails, Part 4 includes a troubleshooting section that walks through cluster status, context, node, Pod, networking, ingress, and storage diagnosis. See **section 4.7**.
+
 If `kubectl` later appears to be talking to an old or stale minikube endpoint, compare what `kubectl` thinks the current cluster is with what minikube reports:
 
 ```bash
@@ -198,6 +202,8 @@ Why these addons are enabled:
 
 - **ingress** provides the nginx ingress controller used later in the tutorial
 - **metrics-server** provides resource-usage data for commands such as `kubectl top`
+
+If enabling addons fails or they do not appear healthy afterward, the troubleshooting guide in **Part 4, section 4.7** gives a structured way to inspect cluster status, system Pods, events, and addon-related failures.
 
 ## 1.11 Cluster infrastructure
 
