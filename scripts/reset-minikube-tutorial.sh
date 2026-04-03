@@ -2,9 +2,42 @@
 set -euo pipefail
 
 MINIKUBE_PROFILE="${MINIKUBE_PROFILE:-minikube}"
+ASSUME_YES="${ASSUME_YES:-false}"
 
 printf 'Updating kubectl context for profile: %s\n' "$MINIKUBE_PROFILE"
 minikube -p "$MINIKUBE_PROFILE" update-context >/dev/null
+
+CURRENT_CONTEXT="$(kubectl config current-context)"
+printf '\nWARNING: this script is destructive.\n'
+printf 'It will delete the tutorial namespace and remove non-system user workloads from the default namespace.\n'
+printf 'Review the target cluster information carefully before continuing.\n\n'
+
+printf 'Target kubectl context: %s\n' "$CURRENT_CONTEXT"
+printf 'Minikube profile: %s\n' "$MINIKUBE_PROFILE"
+printf '\nCluster info:\n'
+kubectl cluster-info || true
+printf '\nNamespaces currently present:\n'
+kubectl get ns
+
+if [ "$ASSUME_YES" != "true" ]; then
+  printf '\nType the exact kubectl context name to continue: '
+  read -r CONFIRM_CONTEXT
+  if [ "$CONFIRM_CONTEXT" != "$CURRENT_CONTEXT" ]; then
+    printf 'Context confirmation did not match. Aborting.\n' >&2
+    exit 1
+  fi
+
+  printf 'Final confirmation: delete tutorial resources from context "%s"? [y/N]: ' "$CURRENT_CONTEXT"
+  read -r CONFIRM_DELETE
+  case "$CONFIRM_DELETE" in
+    y|Y|yes|YES)
+      ;;
+    *)
+      printf 'Aborting without making changes.\n'
+      exit 1
+      ;;
+  esac
+fi
 
 printf '\nDeleting tutorial namespace if present...\n'
 kubectl delete namespace tutorial --ignore-not-found=true --wait=true
