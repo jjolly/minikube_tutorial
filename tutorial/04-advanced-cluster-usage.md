@@ -304,47 +304,14 @@ minikube addons enable <addon-name>
 minikube addons disable <addon-name>
 ```
 
-Below is a practical "top 10" list of addons that are useful once the core tutorial is no longer brand new.
+Two important addons have already been used in this tutorial:
 
-### 4.8 ingress
+- `ingress`
+- `metrics-server`
 
-What it does:
+Those were introduced earlier because they were needed for the main walkthrough. The list below focuses on **additional addons** you can experiment with after the core tutorial, while still keeping a practical top-10 set overall.
 
-- installs the nginx ingress controller used for HTTP routing into cluster services
-
-Why it is useful:
-
-- lets you route multiple HTTP applications through one entrypoint
-- makes host/path-based routing experiments easy
-
-Basic use:
-
-```bash
-minikube addons enable ingress
-kubectl get pods -n ingress-nginx
-kubectl get ingress -A
-```
-
-### 4.9 metrics-server
-
-What it does:
-
-- provides resource-usage data used by the Kubernetes metrics APIs
-
-Why it is useful:
-
-- lets you use `kubectl top`
-- helps you see actual CPU and memory usage rather than only declared requests and limits
-
-Basic use:
-
-```bash
-minikube addons enable metrics-server
-kubectl top nodes
-kubectl top pods -A
-```
-
-### 4.10 dashboard
+### 4.8 dashboard
 
 What it does:
 
@@ -362,7 +329,7 @@ minikube addons enable dashboard
 minikube dashboard
 ```
 
-### 4.11 storage-provisioner
+### 4.9 storage-provisioner
 
 What it does:
 
@@ -381,7 +348,7 @@ kubectl get storageclass
 kubectl get pvc -A
 ```
 
-### 4.12 default-storageclass
+### 4.10 default-storageclass
 
 What it does:
 
@@ -399,7 +366,7 @@ minikube addons enable default-storageclass
 kubectl get storageclass
 ```
 
-### 4.13 registry
+### 4.11 registry
 
 What it does:
 
@@ -419,7 +386,7 @@ kubectl get svc -n kube-system
 
 This one often benefits from reading the current minikube docs before deeper use, because local image workflow details can vary by driver and setup.
 
-### 4.14 registry-creds
+### 4.12 registry-creds
 
 What it does:
 
@@ -439,7 +406,7 @@ kubectl get pods -n kube-system
 
 This addon is more interesting once you have a real registry workflow to test.
 
-### 4.15 volumesnapshots
+### 4.13 volumesnapshots
 
 What it does:
 
@@ -457,7 +424,7 @@ minikube addons enable volumesnapshots
 kubectl api-resources | grep -i snapshot
 ```
 
-### 4.16 csi-hostpath-driver
+### 4.14 csi-hostpath-driver
 
 What it does:
 
@@ -476,7 +443,7 @@ kubectl get csidrivers
 kubectl get pods -A | grep csi || true
 ```
 
-### 4.17 gvisor
+### 4.15 gvisor
 
 What it does:
 
@@ -496,7 +463,7 @@ kubectl get runtimeclass
 
 This is more advanced than the others because it leads into runtime-class and sandboxing topics.
 
-### 4.18 logviewer
+### 4.16 logviewer
 
 What it does:
 
@@ -514,30 +481,49 @@ minikube addons enable logviewer
 minikube service logviewer -n kube-system
 ```
 
-### 4.19 How to choose what to try next
+### 4.17 metallb
+
+What it does:
+
+- provides a software load-balancer implementation for bare-metal or local-cluster style environments
+
+Why it is useful:
+
+- helps you experiment with `LoadBalancer` Services in an environment that does not have a cloud-provider load balancer by default
+- useful when you want to better understand how service exposure differs between local clusters and cloud clusters
+
+Basic use:
+
+```bash
+minikube addons enable metallb
+kubectl get pods -n metallb-system
+```
+
+This addon becomes more interesting when you start experimenting with `Service` objects of type `LoadBalancer`.
+
+### 4.18 How to choose what to try next
 
 A good order of experimentation after the core tutorial would be:
 
-1. `metrics-server`
-2. `dashboard`
-3. `ingress`
-4. `storage-provisioner` and `default-storageclass`
-5. `registry` / `registry-creds`
-6. `volumesnapshots` / `csi-hostpath-driver`
-7. `gvisor`
-8. `logviewer`
+1. `dashboard`
+2. `storage-provisioner` and `default-storageclass`
+3. `metallb`
+4. `registry` / `registry-creds`
+5. `volumesnapshots` / `csi-hostpath-driver`
+6. `gvisor`
+7. `logviewer`
 
-That order moves from low-friction observability features toward more advanced storage, runtime, and image-distribution topics.
+That order moves from low-friction visibility and storage features toward more advanced network exposure, runtime, and image-distribution topics.
 
 One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
 
-## 4.20 Exercise notes and possible solutions
+## 4.19 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.21 Pod access challenge from section 2.5
+### 4.20 Pod access challenge from section 2.5
 
 Question:
 
@@ -556,7 +542,7 @@ Expected shape of response:
 hello from echo-pod
 ```
 
-### 4.22 Namespace default challenge from section 2.11
+### 4.21 Namespace default challenge from section 2.11
 
 Question:
 
@@ -568,7 +554,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.23 Label selector challenge from section 2.13
+### 4.22 Label selector challenge from section 2.13
 
 Question:
 
@@ -580,7 +566,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.24 Deployment observation challenge from section 2.15
+### 4.23 Deployment observation challenge from section 2.15
 
 Questions:
 
@@ -618,7 +604,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.25 Ingress route prediction challenge from section 3.11
+### 4.24 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -634,7 +620,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 4.26 What is already ready for polish later
+## 4.25 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 
