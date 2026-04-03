@@ -49,8 +49,6 @@ config/
   04-genkey-full/
   05-journal/
   advanced/
-scripts/
-  reset-minikube-tutorial.sh
 ```
 
 How to use this layout:
@@ -62,7 +60,7 @@ How to use this layout:
 - `src/01-pods/` is present as a placeholder/explanation stage because the earliest examples use stock public images rather than custom application source code.
 - `config/05-journal/step1-startup-init/` contains the first database-init approach.
 - `config/05-journal/step2-job-init/` contains the improved database-init approach.
-- `scripts/reset-minikube-tutorial.sh` resets tutorial resources. It is intentionally destructive and requires explicit confirmation of the target context before proceeding.
+- if you want a full tutorial reset, use `minikube delete` and then continue again from section `1.9` in Part 1.
 
 ## Modules
 
@@ -80,4 +78,4 @@ If you are revisiting the tutorial later:
 - start with **Part 1** if you need cluster setup or infrastructure refreshers
 - jump to **Part 2** if you want core Kubernetes object behavior
 - jump to **Part 3** if you want application-focused examples
-- jump to **Part 4** if you want RBAC, gateway alternatives, exercise notes, or reset-script guidance
+- jump to **Part 4** if you want RBAC, gateway alternatives, or exercise notes

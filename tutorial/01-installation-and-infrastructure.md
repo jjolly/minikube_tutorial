@@ -140,6 +140,26 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 minikube version
 ```
 
+If you ever want to reset the tutorial back to a clean cluster state, the simplest supported approach is to delete the entire minikube cluster and recreate it rather than trying to clean up Kubernetes objects one by one.
+
+Use:
+
+```bash
+minikube delete
+```
+
+Or, if you want to be explicit about the profile:
+
+```bash
+minikube delete -p minikube
+```
+
+What this is for:
+
+- it removes the minikube cluster itself rather than only deleting tutorial workloads
+- it is the cleanest way to return to a known starting point
+- after doing this, continue from **section 1.9** to start the cluster again
+
 ### 1.9 Start and verify the cluster
 
 Start minikube with Docker as the driver:

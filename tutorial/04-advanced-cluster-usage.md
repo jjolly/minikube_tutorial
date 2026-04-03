@@ -97,31 +97,13 @@ If you later want one advanced Gateway-focused extension, the best first options
 1. **NGINX Gateway Fabric**
 2. **Envoy Gateway**
 
-## 4.5 Reset script warning and safe use
-
-The reset helper exists to make repeated tutorial runs easier, but it is intentionally destructive.
-
-File:
-
-- `scripts/reset-minikube-tutorial.sh`
-
-The script now:
-
-- updates the kubectl context for the selected minikube profile
-- shows the current kubectl context and cluster info
-- lists namespaces before doing anything destructive
-- requires you to type the exact current context name
-- asks for a final confirmation before deletion begins
-
-That makes it safer to use on a workstation where you might have more than one Kubernetes context configured.
-
-## 4.6 Exercise notes and possible solutions
+## 4.5 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.7 Pod access challenge from section 2.5
+### 4.6 Pod access challenge from section 2.5
 
 Question:
 
@@ -140,7 +122,7 @@ Expected shape of response:
 hello from echo-pod
 ```
 
-### 4.8 Namespace default challenge from section 2.11
+### 4.7 Namespace default challenge from section 2.11
 
 Question:
 
@@ -152,7 +134,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.9 Label selector challenge from section 2.13
+### 4.8 Label selector challenge from section 2.13
 
 Question:
 
@@ -164,7 +146,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.10 Deployment observation challenge from section 2.15
+### 4.9 Deployment observation challenge from section 2.15
 
 Questions:
 
@@ -202,7 +184,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.11 Ingress route prediction challenge from section 3.11
+### 4.10 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -218,7 +200,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 4.12 What is already ready for polish later
+## 4.11 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 
