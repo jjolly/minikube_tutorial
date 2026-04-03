@@ -55,31 +55,7 @@ kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutori
 
 The second command should print `no`.
 
-## 4.3 Advanced topics: Gateway and alternatives to Ingress
-
-The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
-
-See:
-
-- `config/advanced/gateway-options.md`
-
-Summary of options:
-
-- **NGINX Gateway Fabric**
-- **Envoy Gateway**
-- **Cilium Gateway API**
-- **Istio Gateway API support**
-
-### 4.3.1 Recommendation
-
-Keep the main tutorial on **Ingress**.
-
-If you later want one advanced Gateway-focused extension, the best first options are:
-
-1. **NGINX Gateway Fabric**
-2. **Envoy Gateway**
-
-## 4.4 Minikube profiles
+## 4.3 Minikube profiles
 
 So far, the tutorial has treated minikube as if there were only one cluster. That is the right simplification for the main walkthrough. But minikube can manage more than one local cluster by using **profiles**.
 
@@ -122,13 +98,13 @@ That means profiles are useful when you want stronger separation than a namespac
 
 For this tutorial, you do not need profiles to succeed. But once you start revisiting the tutorial, they can be a practical way to keep a clean lab environment without interfering with other minikube work.
 
-## 4.5 Multi-node minikube clusters
+## 4.4 Multi-node minikube clusters
 
 The main tutorial uses a single-node minikube cluster because that is the clearest starting point. But minikube can also create a **multi-node** cluster, which is one of the easiest ways to get hands-on experience with scheduling across more than one node.
 
 This is still a local lab. The additional nodes are not separate physical machines in the way they might be in a cloud or data-center environment. But they are still useful because Kubernetes now has more than one node to choose from when placing workloads.
 
-### 4.5.1 Why try this in minikube?
+### 4.4.1 Why try this in minikube?
 
 A multi-node minikube cluster is useful when you want to see:
 
@@ -139,7 +115,7 @@ A multi-node minikube cluster is useful when you want to see:
 
 This belongs in the advanced part of the tutorial because the main walkthrough does not need multiple nodes. But once the basics are comfortable, multi-node behavior is worth seeing directly.
 
-### 4.5.2 Creating a multi-node minikube cluster
+### 4.4.2 Creating a multi-node minikube cluster
 
 A common way to do this is to create a new profile so you do not disturb your existing tutorial cluster.
 
@@ -167,7 +143,7 @@ If you want to remove this lab later:
 minikube delete -p multinode-lab
 ```
 
-### 4.5.3 What to observe once it is running
+### 4.4.3 What to observe once it is running
 
 Useful commands:
 
@@ -184,7 +160,7 @@ What to look for:
 
 The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
 
-### 4.5.4 A simple way to experience scheduling across nodes
+### 4.4.4 A simple way to experience scheduling across nodes
 
 One easy experiment is to create a Deployment with several replicas and then inspect where those replicas landed.
 
@@ -205,7 +181,7 @@ What to observe:
 
 This is one of the first moments where the abstract idea of "a cluster has multiple nodes" starts to feel concrete.
 
-### 4.5.5 Important limitations of this experience
+### 4.4.5 Important limitations of this experience
 
 It is still important to keep expectations realistic.
 
@@ -223,6 +199,30 @@ But it does **not** automatically recreate all the realities of a larger environ
 - failure modes are still simpler than many production environments
 
 So the value of this experiment is not "now I have production." The value is "now I can see Kubernetes making placement decisions across multiple nodes."
+
+## 4.5 Advanced topics: Gateway and alternatives to Ingress
+
+The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
+
+See:
+
+- `config/advanced/gateway-options.md`
+
+Summary of options:
+
+- **NGINX Gateway Fabric**
+- **Envoy Gateway**
+- **Cilium Gateway API**
+- **Istio Gateway API support**
+
+### 4.5.1 Recommendation
+
+Keep the main tutorial on **Ingress**.
+
+If you later want one advanced Gateway-focused extension, the best first options are:
+
+1. **NGINX Gateway Fabric**
+2. **Envoy Gateway**
 
 ## 4.6 Minikube limitations and Kubernetes alternatives
 
