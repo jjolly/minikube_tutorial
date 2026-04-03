@@ -400,14 +400,95 @@ Later, after you create workloads in the `tutorial` namespace, `kubectl top pods
 
 A **pod** is the smallest deployable unit in Kubernetes.
 
+If you are coming from Docker, a useful first mental model is:
+
+- a **container image** is the packaged application filesystem and startup definition
+- a **container** is a running instance created from that image
+- a **Pod** is the Kubernetes object that tells the cluster to run one or more containers together
+
+In many beginner examples, a Pod runs just one container, so it is tempting to think of a Pod and a container as the same thing. They are related, but not identical:
+
+- the **image** is what gets run
+- the **container** is the running process instance created from the image
+- the **Pod** is the Kubernetes wrapper that gives that running container a place in the cluster's scheduling, networking, and lifecycle model
+
+That distinction becomes more important later, but it is worth naming now.
+
 ### 4.1 Run a short-lived BusyBox pod
+
+This first Pod is meant to be temporary and easy to inspect.
+
+The image used here is `busybox:1.36`, which is a very small Linux userspace image often used for demonstrations, debugging, and simple shell commands.
+
+Before you run the command, one small timing note matters:
+
+- the Pod's shell command will print a message immediately
+- then it will **sleep for 15 seconds**
+- during that sleep time, the Pod still exists and can be inspected
+- after the sleep ends, the shell command exits and the Pod's main work is finished
+
+That pause is intentional. It gives you a short window to look at the Pod while it is alive.
+
+Create the Pod:
 
 ```bash
 kubectl run bb-demo --image=busybox:1.36 --restart=Never --command -- sh -c 'echo hello from kubernetes && sleep 15'
+```
+
+What this command means:
+
+- `kubectl run bb-demo`
+  - asks Kubernetes to create a Pod named `bb-demo`
+- `--image=busybox:1.36`
+  - tells Kubernetes which container image to start inside that Pod
+- `--restart=Never`
+  - tells Kubernetes to create a plain Pod for this one-off example rather than a higher-level controller
+- `--command -- sh -c 'echo hello from kubernetes && sleep 15'`
+  - overrides the container startup command so it runs a shell
+  - the shell prints a message and then waits 15 seconds before exiting
+
+What happens after you press Enter:
+
+1. Kubernetes accepts the request to create the Pod
+2. the node pulls the image if it is not already present
+3. the container starts and runs the shell command
+4. the command prints its message
+5. the command sleeps for 15 seconds, giving you time to inspect the Pod
+6. the shell exits, so the Pod's main task is complete
+
+Read the Pod's logs:
+
+```bash
 kubectl logs bb-demo
+```
+
+What this shows:
+
+- the text written by the command running inside the container
+- in this example, that should be the `hello from kubernetes` output
+
+Check the Pod status:
+
+```bash
 kubectl get pod bb-demo
+```
+
+What to look for:
+
+- if you run this while the `sleep 15` is still in progress, the Pod may show as `Running`
+- if you run it after the sleep ends, it may show as `Completed`
+
+That timing difference is useful. It shows that a Pod can exist for a short task, not only for long-running servers.
+
+Clean up the Pod:
+
+```bash
 kubectl delete pod bb-demo
 ```
+
+Why delete it if it may already be finished?
+
+Because a finished Pod can still remain as a cluster object until you remove it. Deleting it keeps the tutorial environment tidy before moving on.
 
 ### 4.2 Create a long-running pod from YAML
 
