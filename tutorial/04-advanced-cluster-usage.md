@@ -140,7 +140,109 @@ That means profiles are useful when you want stronger separation than a namespac
 
 For this tutorial, you do not need profiles to succeed. But once you start revisiting the tutorial, they can be a practical way to keep a clean lab environment without interfering with other minikube work.
 
-## 4.6 Minikube limitations and Kubernetes alternatives
+## 4.6 Multi-node minikube clusters
+
+The main tutorial uses a single-node minikube cluster because that is the clearest starting point. But minikube can also create a **multi-node** cluster, which is one of the easiest ways to get hands-on experience with scheduling across more than one node.
+
+This is still a local lab. The additional nodes are not separate physical machines in the way they might be in a cloud or data-center environment. But they are still useful because Kubernetes now has more than one node to choose from when placing workloads.
+
+### 4.7 Why try this in minikube?
+
+A multi-node minikube cluster is useful when you want to see:
+
+- that a cluster can have more than one schedulable node
+- that Pods can land on different nodes
+- how labels, scheduling, and placement start to matter more when there is actual choice
+- how `kubectl get nodes` and `kubectl get pods -o wide` become more interesting
+
+This belongs in the advanced part of the tutorial because the main walkthrough does not need multiple nodes. But once the basics are comfortable, multi-node behavior is worth seeing directly.
+
+### 4.8 Creating a multi-node minikube cluster
+
+A common way to do this is to create a new profile so you do not disturb your existing tutorial cluster.
+
+For example:
+
+```bash
+minikube start -p multinode-lab --driver=docker --nodes 2
+kubectl config use-context multinode-lab
+kubectl get nodes -o wide
+```
+
+What these commands do:
+
+- `minikube start -p multinode-lab --driver=docker --nodes 2`
+  - creates a separate minikube profile named `multinode-lab`
+  - asks minikube to create a two-node cluster instead of a single-node one
+- `kubectl config use-context multinode-lab`
+  - points `kubectl` at that cluster
+- `kubectl get nodes -o wide`
+  - lets you confirm that more than one node is now present
+
+If you want to remove this lab later:
+
+```bash
+minikube delete -p multinode-lab
+```
+
+### 4.9 What to observe once it is running
+
+Useful commands:
+
+```bash
+kubectl get nodes -o wide
+kubectl get pods -A -o wide
+```
+
+What to look for:
+
+- more than one node listed in `kubectl get nodes`
+- system Pods distributed across nodes rather than everything appearing on one machine
+- later, your own application Pods may land on different nodes as well
+
+The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
+
+### 4.10 A simple way to experience scheduling across nodes
+
+One easy experiment is to create a Deployment with several replicas and then inspect where those replicas landed.
+
+Useful commands:
+
+```bash
+kubectl create deployment hello-multi --image=nginx:1.27-alpine
+kubectl scale deployment hello-multi --replicas=4
+kubectl rollout status deployment/hello-multi
+kubectl get pods -o wide
+```
+
+What to observe:
+
+- Kubernetes may place the replicas across the available nodes
+- the `NODE` column in `kubectl get pods -o wide` tells you where each replica ended up
+- even when the image and template are identical, the scheduler can spread work across nodes instead of packing everything into one place
+
+This is one of the first moments where the abstract idea of "a cluster has multiple nodes" starts to feel concrete.
+
+### 4.11 Important limitations of this experience
+
+It is still important to keep expectations realistic.
+
+A multi-node minikube cluster helps you explore:
+
+- scheduling across nodes
+- node-level visibility in `kubectl`
+- some placement and resource behaviors
+
+But it does **not** automatically recreate all the realities of a larger environment. For example:
+
+- the nodes are still part of one local setup
+- local resource bottlenecks still come from the same host machine
+- networking and storage behavior are still shaped by the local minikube environment
+- failure modes are still simpler than many production environments
+
+So the value of this experiment is not "now I have production." The value is "now I can see Kubernetes making placement decisions across multiple nodes."
+
+## 4.12 Minikube limitations and Kubernetes alternatives
 
 Minikube is excellent for learning Kubernetes concepts, testing manifests, and experimenting with application behavior on a local machine. But it is still a **local development cluster**, not a full substitute for every kind of Kubernetes environment.
 
@@ -285,7 +387,7 @@ Even when the surrounding environment changes, many of the core lessons in this 
 
 That is the most important thing to remember: minikube is not the end state for every Kubernetes user, but it is still a very good way to build the conceptual foundation.
 
-## 4.7 Cluster troubleshooting: what to check and which tools to use
+## 4.13 Cluster troubleshooting: what to check and which tools to use
 
 When a cluster is not behaving the way you expected, it helps to think in layers instead of guessing randomly.
 
@@ -299,7 +401,7 @@ A useful troubleshooting order is:
 
 The goal of this section is not to turn you into a production SRE in one step. It is to give you a practical toolkit for diagnosing common minikube and Kubernetes problems.
 
-### 4.8 First checks: cluster status and context
+### 4.14 First checks: cluster status and context
 
 Start with the broadest questions first.
 
@@ -336,7 +438,7 @@ If the context appears stale after recreating a cluster, a useful repair command
 minikube update-context
 ```
 
-### 4.9 Inspect the node and system components
+### 4.15 Inspect the node and system components
 
 If the cluster exists but still seems unhealthy, check the node and the core supporting Pods.
 
@@ -356,7 +458,7 @@ What to look for:
 
 This is often where addon failures or cluster-level issues first become visible.
 
-### 4.10 Diagnose a Pod that did not start correctly
+### 4.16 Diagnose a Pod that did not start correctly
 
 If your workload exists but is not healthy, inspect the Pod directly.
 
@@ -388,7 +490,7 @@ A good beginner habit is:
 - use `describe` for Kubernetes' explanation of what happened
 - use `logs` for the application's own output
 
-### 4.11 Diagnose Deployment rollout problems
+### 4.17 Diagnose Deployment rollout problems
 
 Deployments add another layer because Kubernetes is trying to maintain a desired number of Pods for you.
 
@@ -410,7 +512,7 @@ What these help you answer:
 
 This is especially useful when a Deployment exists but the application still does not seem reachable.
 
-### 4.12 Diagnose Service and networking problems
+### 4.18 Diagnose Service and networking problems
 
 If the Pods are healthy but traffic is not getting through, shift from workload troubleshooting to networking troubleshooting.
 
@@ -437,7 +539,7 @@ Typical failure patterns:
 - the application is listening on a different port than the Service expects
 - DNS or path assumptions are wrong
 
-### 4.13 Diagnose Ingress and HTTP routing problems
+### 4.19 Diagnose Ingress and HTTP routing problems
 
 If the Services work but HTTP routing still fails, inspect the ingress layer.
 
@@ -459,7 +561,7 @@ What these help you answer:
 
 A common beginner mistake is assuming an Ingress YAML problem when the real issue is that traffic is reaching the wrong port or host header.
 
-### 4.14 Diagnose storage and PVC problems
+### 4.20 Diagnose storage and PVC problems
 
 When storage is involved, check both the claim and the workload using it.
 
@@ -481,7 +583,7 @@ What these help you answer:
 
 This matters because sometimes a Pod looks broken when the real failure is that its storage never became available.
 
-### 4.15 High-value troubleshooting commands to remember
+### 4.21 High-value troubleshooting commands to remember
 
 If you only remember a short list, remember these:
 
@@ -501,7 +603,7 @@ kubectl get events -A --sort-by=.lastTimestamp
 
 These commands cover a surprisingly large percentage of beginner and intermediate cluster problems.
 
-### 4.16 Troubleshooting mindset
+### 4.22 Troubleshooting mindset
 
 A few habits will save you time:
 
@@ -518,7 +620,7 @@ For local clusters especially, it is also fair to ask a very practical question:
 
 Sometimes the answer is yes, especially in a learning environment.
 
-## 4.17 Ten minikube addons worth exploring
+## 4.23 Ten minikube addons worth exploring
 
 Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, minikube addons are one of the easiest ways to keep experimenting.
 
@@ -548,7 +650,7 @@ Two important addons have already been used in this tutorial:
 
 Those were introduced earlier because they were needed for the main walkthrough. The list below focuses on **additional addons** you can experiment with after the core tutorial, while still keeping a practical top-10 set overall.
 
-### 4.18 dashboard
+### 4.24 dashboard
 
 What it does:
 
@@ -566,7 +668,7 @@ minikube addons enable dashboard
 minikube dashboard
 ```
 
-### 4.19 storage-provisioner
+### 4.25 storage-provisioner
 
 What it does:
 
@@ -585,7 +687,7 @@ kubectl get storageclass
 kubectl get pvc -A
 ```
 
-### 4.20 default-storageclass
+### 4.26 default-storageclass
 
 What it does:
 
@@ -603,7 +705,7 @@ minikube addons enable default-storageclass
 kubectl get storageclass
 ```
 
-### 4.21 registry
+### 4.27 registry
 
 What it does:
 
@@ -623,7 +725,7 @@ kubectl get svc -n kube-system
 
 This one often benefits from reading the current minikube docs before deeper use, because local image workflow details can vary by driver and setup.
 
-### 4.22 registry-creds
+### 4.28 registry-creds
 
 What it does:
 
@@ -643,7 +745,7 @@ kubectl get pods -n kube-system
 
 This addon is more interesting once you have a real registry workflow to test.
 
-### 4.23 volumesnapshots
+### 4.29 volumesnapshots
 
 What it does:
 
@@ -661,7 +763,7 @@ minikube addons enable volumesnapshots
 kubectl api-resources | grep -i snapshot
 ```
 
-### 4.24 csi-hostpath-driver
+### 4.30 csi-hostpath-driver
 
 What it does:
 
@@ -680,7 +782,7 @@ kubectl get csidrivers
 kubectl get pods -A | grep csi || true
 ```
 
-### 4.25 gvisor
+### 4.31 gvisor
 
 What it does:
 
@@ -700,7 +802,7 @@ kubectl get runtimeclass
 
 This is more advanced than the others because it leads into runtime-class and sandboxing topics.
 
-### 4.26 logviewer
+### 4.32 logviewer
 
 What it does:
 
@@ -718,7 +820,7 @@ minikube addons enable logviewer
 minikube service logviewer -n kube-system
 ```
 
-### 4.27 metallb
+### 4.33 metallb
 
 What it does:
 
@@ -738,7 +840,7 @@ kubectl get pods -n metallb-system
 
 This addon becomes more interesting when you start experimenting with `Service` objects of type `LoadBalancer`.
 
-### 4.28 How to choose what to try next
+### 4.34 How to choose what to try next
 
 A good order of experimentation after the core tutorial would be:
 
@@ -754,13 +856,13 @@ That order moves from low-friction visibility and storage features toward more a
 
 One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
 
-## 4.29 Exercise notes and possible solutions
+## 4.35 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.30 Pod access challenge from section 2.5
+### 4.36 Pod access challenge from section 2.5
 
 Question:
 
@@ -779,7 +881,7 @@ Expected shape of response:
 hello from echo-pod
 ```
 
-### 4.31 Namespace default challenge from section 2.11
+### 4.37 Namespace default challenge from section 2.11
 
 Question:
 
@@ -791,7 +893,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.32 Label selector challenge from section 2.13
+### 4.38 Label selector challenge from section 2.13
 
 Question:
 
@@ -803,7 +905,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.33 Deployment observation challenge from section 2.15
+### 4.39 Deployment observation challenge from section 2.15
 
 Questions:
 
@@ -841,7 +943,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.34 Ingress route prediction challenge from section 3.11
+### 4.40 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -857,7 +959,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 4.35 What is already ready for polish later
+## 4.41 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 
