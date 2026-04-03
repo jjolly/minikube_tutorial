@@ -856,6 +856,19 @@ kubectl get svc
 
 At this point, those commands should use `tutorial` by default.
 
+### Small challenge
+
+Before moving on, try this yourself:
+
+- run `kubectl get pods` without `-n tutorial`
+- then run `kubectl get pods -n default`
+
+Question to think about:
+
+- which command shows your tutorial Pod, and why?
+
+If the result is not what you expected, look back at `kubectl config set-context --current --namespace=tutorial` and `kubectl config view --minify`.
+
 ## 8. Labels
 
 **Labels** are key/value pairs attached to objects. Kubernetes uses them heavily for selection.
@@ -877,6 +890,21 @@ Why this matters:
 - the first command shows which labels are present
 - the second command shows how Kubernetes can use labels to find matching objects
 - later, Services and Deployments rely on this same idea
+
+### Small challenge
+
+Try changing the selector yourself:
+
+```bash
+kubectl get pods -n tutorial -l tier=demo
+```
+
+Question to think about:
+
+- do you get any results yet?
+- if not, why not?
+
+You can answer that by comparing the labels on the current Pod with the labels you will see later in the Deployment template.
 
 ## 9. Deployments
 
@@ -955,6 +983,21 @@ kubectl get pods -n tutorial -o wide
 ```
 
 Because the Service still selects `app: echo`, it can target the new Pods without changing the Service definition.
+
+### Small challenge
+
+Before you continue, try answering this by observation:
+
+- after scaling to 3 replicas, how many Pods do you expect `kubectl get pods -n tutorial` to show for this Deployment?
+- which label would you use if you wanted to list only the Pods managed by this application?
+
+One way to check yourself is:
+
+```bash
+kubectl get pods -n tutorial -l app=echo
+```
+
+If you want an extra stretch goal, run the Service through `port-forward` again and send a few requests. Later in the tutorial, if the backend Pods identify themselves, repeated responses can help make load balancing visible.
 
 ## 10. ConfigMaps
 
@@ -1531,6 +1574,16 @@ Why this is split out:
 
 - the Ingress object defines routing rules
 - these extra commands discover how the ingress controller is actually reachable in your local minikube environment
+
+### Small challenge
+
+Before you run the three `curl` commands below, look at the Ingress manifest and make a prediction:
+
+- which backend should receive `/genkey/`?
+- which backend should receive `/genkey/api`?
+- which backend should receive `/journal/`?
+
+That is a useful habit in Kubernetes: read the routing rule first, then test whether the live system behaves the way you expected.
 
 Test the routes with the expected host header:
 
