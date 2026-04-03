@@ -493,25 +493,36 @@ Why delete it if it may already be finished?
 
 Because a finished Pod can still remain as a cluster object until you remove it. Deleting it keeps the tutorial environment tidy before moving on.
 
-### 4.2 Create a long-running pod from YAML
+### 4.2 Create long-running Pods from YAML
 
-The previous example created a short-lived Pod directly from the command line. This next example moves to a more typical Kubernetes workflow: define the Pod in YAML, apply it, and inspect the object Kubernetes creates.
+The previous example created a short-lived Pod directly from the command line. This next section moves to a more typical Kubernetes workflow: define a Pod in YAML, apply it, and inspect the object Kubernetes creates.
 
-File: `config/01-pods/pod-echo.yaml`
+To keep the learning curve reasonable, this section now uses **two Pod examples**:
+
+1. a very simple YAML Pod
+2. a slightly richer Pod that can report its own identity
+
+The first keeps the YAML easy to read. The second sets up a more interesting response for the Service and Deployment sections that follow.
+
+### 4.2.1 Simple YAML Pod first
+
+Start with the simplest version.
+
+File: `config/01-pods/pod-simple-echo.yaml`
 
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: echo-pod
+  name: simple-echo-pod
   labels:
-    app: echo
+    app: simple-echo
 spec:
   containers:
     - name: echo
       image: hashicorp/http-echo:1.0.0
       args:
-        - "-text=hello from echo-pod"
+        - "-text=hello from simple-echo-pod"
       ports:
         - containerPort: 5678
 ```
@@ -519,15 +530,15 @@ spec:
 Apply the manifest:
 
 ```bash
-kubectl apply -f config/01-pods/pod-echo.yaml
+kubectl apply -f config/01-pods/pod-simple-echo.yaml
 ```
 
 What just happened:
 
 - Kubernetes received the Pod definition from the YAML file
-- it created a Pod object named `echo-pod`
+- it created a Pod object named `simple-echo-pod`
 - the node then started a container from the `hashicorp/http-echo:1.0.0` image
-- that container runs a tiny HTTP server which replies with the text you supplied in `args`
+- that container runs a tiny HTTP server which replies with the exact text you supplied in `args`
 
 List the Pods:
 
@@ -543,7 +554,7 @@ Why this is a separate step:
 Describe the Pod in detail:
 
 ```bash
-kubectl describe pod echo-pod
+kubectl describe pod simple-echo-pod
 ```
 
 Why this is useful:
@@ -555,7 +566,7 @@ Why this is useful:
 Test the Pod from inside the cluster:
 
 ```bash
-POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
+POD_IP=$(kubectl get pod simple-echo-pod -o jsonpath='{.status.podIP}')
 kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
 ```
 
@@ -567,8 +578,82 @@ Why this is written as two commands:
 Expected response:
 
 ```text
+hello from simple-echo-pod
+```
+
+Remove the simple example before moving on:
+
+```bash
+kubectl delete pod simple-echo-pod
+```
+
+That keeps the first example self-contained before introducing the richer Pod used later.
+
+### 4.2.2 A Pod that can identify itself
+
+Now switch to the Pod that the rest of the tutorial will use.
+
+File: `config/01-pods/pod-echo.yaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: echo-pod
+  labels:
+    app: echo
+spec:
+  containers:
+    - name: echo
+      image: hashicorp/http-echo:1.0.0
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      command:
+        - /bin/sh
+        - -c
+      args:
+        - exec /http-echo -text="hello from ${POD_NAME}" -listen=:5678
+      ports:
+        - containerPort: 5678
+```
+
+What is new here:
+
+- `env` defines an environment variable named `POD_NAME`
+- `valueFrom.fieldRef.fieldPath: metadata.name` tells Kubernetes to fill that variable with the Pod's own name
+- `command` and `args` now run a shell first so `${POD_NAME}` can be expanded before starting `http-echo`
+
+This is a little more complicated than the first example, but it becomes very useful later because the response can reflect the actual Pod identity.
+
+Apply the richer Pod manifest:
+
+```bash
+kubectl apply -f config/01-pods/pod-echo.yaml
+kubectl wait --for=condition=Ready pod/echo-pod --timeout=120s
+```
+
+Why these are grouped together:
+
+- the first command creates the Pod
+- the second waits until it is actually ready before you test it
+
+Test it from inside the cluster:
+
+```bash
+POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
+kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
+```
+
+Expected response:
+
+```text
 hello from echo-pod
 ```
+
+That may not look dramatically different yet, but it sets up a better Deployment example later. When several Pods are created from the same template, each one can answer with its own Pod name.
 
 Then clean up the standalone Pod before moving on:
 

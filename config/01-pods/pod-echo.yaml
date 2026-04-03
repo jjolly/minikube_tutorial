@@ -8,7 +8,15 @@ spec:
   containers:
     - name: echo
       image: hashicorp/http-echo:1.0.0
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      command:
+        - /bin/sh
+        - -c
       args:
-        - "-text=hello from echo-pod"
+        - exec /http-echo -text="hello from ${POD_NAME}" -listen=:5678
       ports:
         - containerPort: 5678
