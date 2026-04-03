@@ -198,28 +198,90 @@ If enabling addons fails or they do not appear healthy afterward, the troublesho
 
 The **kube-apiserver** is the front door to the cluster. `kubectl`, controllers, and other cluster components all interact with Kubernetes by talking to the API server.
 
-Use commands that reference objects which already exist at this point in the tutorial:
+At this stage, the main point is not to memorize every line of output. The point is to start recognizing that Kubernetes exposes a large API surface, and that `kubectl` is really a client for that API rather than just a collection of shell shortcuts.
+
+Start by listing resource types the API server knows about:
 
 ```bash
 kubectl api-resources | head -40
+```
+
+What this shows:
+
+- the kinds of things Kubernetes can manage through its API
+- examples you are likely to see in this tutorial include:
+  - `nodes`
+  - `pods`
+  - `services`
+  - `secrets`
+  - `configmaps`
+  - `deployments`
+
+Why this is useful:
+
+- it shows that Kubernetes is managing many different object types, not just containers
+- it gives you a preview of several concepts you will meet later in the tutorial
+
+A helpful clarification: some things you may think of as one "product" or one application are not always represented by one special API kind. For example, a web application might actually be built from several Kubernetes objects working together, such as a Deployment, a Service, a ConfigMap, a Secret, and an Ingress. Kubernetes often models systems as combinations of smaller building blocks rather than one giant object.
+
+Now list API versions:
+
+```bash
 kubectl api-versions
+```
+
+What this shows:
+
+- the API groups and versions exposed by the cluster, such as `v1`, `apps/v1`, or `batch/v1`
+
+Why this matters:
+
+- Kubernetes objects are identified by both `kind` and `apiVersion`
+- later YAML examples will make more sense when you can see that different object families live in different API groups
+
+Check which context `kubectl` is using:
+
+```bash
 kubectl config current-context
+```
+
+What this shows:
+
+- which cluster context your `kubectl` commands are currently targeting
+
+Why this matters:
+
+- it helps confirm that your commands are aimed at the minikube cluster you expect
+
+Check the main cluster endpoints:
+
+```bash
 kubectl cluster-info
+```
+
+What this shows:
+
+- the main control-plane and service endpoints for the current cluster
+
+Why this matters:
+
+- it is one of the quickest ways to confirm that the API server is reachable
+
+Finally, ask the API server for a live object in YAML form:
+
+```bash
 kubectl get nodes -o yaml | head -40
 ```
 
-What these commands show and why they matter:
+What this shows:
 
-- `kubectl api-resources | head -40`
-  - lists resource types the API server knows about
-- `kubectl api-versions`
-  - lists API group and version names exposed by the cluster
-- `kubectl config current-context`
-  - shows which kubeconfig context `kubectl` is currently using
-- `kubectl cluster-info`
-  - shows the main control-plane endpoints for the current cluster
-- `kubectl get nodes -o yaml | head -40`
-  - shows live object data that the API server is serving back right now
+- real object data returned by the API server right now
+- not just a short table, but structured cluster state in YAML form
+
+Why this matters:
+
+- it helps connect the idea of "Kubernetes objects" to the actual data the API server stores and returns
+- later in the tutorial, you will create your own objects and inspect them in the same way
 
 ### 1.2.2 Nodes and kubelet
 
