@@ -912,6 +912,8 @@ A **Deployment** manages rollout for a stateless application.
 
 A standalone Pod is useful for learning, but it is not the usual way to keep an application running. A Deployment describes the desired state for a replaceable set of Pods and lets Kubernetes maintain that state for you.
 
+This example now keeps the self-identifying behavior from the earlier `echo-pod`. That means each replica created by the Deployment can answer with its own Pod name, which makes it much easier to see that the Service is sending traffic to a changing set of backend Pods rather than to one fixed machine.
+
 File: `config/01-pods/deployment-echo.yaml`
 
 ```yaml
@@ -936,8 +938,16 @@ spec:
       containers:
         - name: echo
           image: hashicorp/http-echo:1.0.0
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          command:
+            - /bin/sh
+            - -c
           args:
-            - "-text=hello from echo-deployment"
+            - exec /http-echo -text="hello from ${POD_NAME}" -listen=:5678
           ports:
             - containerPort: 5678
 ```
@@ -984,6 +994,18 @@ kubectl get pods -n tutorial -o wide
 
 Because the Service still selects `app: echo`, it can target the new Pods without changing the Service definition.
 
+If you port-forward the Service again and send repeated requests, you may now see different Pod names in the responses. That is one of the nicest ways to make the Deployment-plus-Service pattern feel concrete.
+
+For example, different requests might return values shaped like:
+
+```text
+hello from echo-deployment-7d8c6c9f5b-abc12
+hello from echo-deployment-7d8c6c9f5b-def34
+hello from echo-deployment-7d8c6c9f5b-ghi56
+```
+
+The exact names will be different in your cluster, but the important point is that each response can come from a different replica.
+
 ### Small challenge
 
 Before you continue, try answering this by observation:
@@ -997,7 +1019,7 @@ One way to check yourself is:
 kubectl get pods -n tutorial -l app=echo
 ```
 
-If you want an extra stretch goal, run the Service through `port-forward` again and send a few requests. Later in the tutorial, if the backend Pods identify themselves, repeated responses can help make load balancing visible.
+If you want an extra stretch goal, run the Service through `port-forward` again and send a few requests. If the responses show different Pod names over time, that is strong evidence that the Service is distributing traffic across the available replicas rather than always choosing one fixed backend.
 
 ## 10. ConfigMaps
 
