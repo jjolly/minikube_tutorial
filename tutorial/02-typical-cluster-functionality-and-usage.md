@@ -303,7 +303,7 @@ Hints:
 
 If you want to try it on your own first, stop here for a moment.
 
-The answer appears at the start of the Services section, so you can check your work there if needed.
+A possible answer appears later in the exercise notes section in **Part 4, section 4.8**, so you can check your work there if needed.
 
 That little exercise is worth doing because it reinforces that Kubernetes is not doing anything magical yet. At this point, you are still reaching one specific Pod by its IP, just as before.
 
