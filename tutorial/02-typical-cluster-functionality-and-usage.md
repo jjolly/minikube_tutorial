@@ -264,6 +264,25 @@ What is new here:
 - `valueFrom.fieldRef.fieldPath: metadata.name` tells Kubernetes to fill that variable with the Pod's own name
 - `command` and `args` now run a shell first so `${POD_NAME}` can be expanded before starting `http-echo`
 
+This `fieldRef` pattern is part of the Kubernetes **Downward API**, which lets a container learn selected information about the Pod it is running in.
+
+A few common `fieldPath` values worth knowing are:
+
+- `metadata.name`
+  - the Pod's name
+- `metadata.namespace`
+  - the namespace the Pod is running in
+- `spec.nodeName`
+  - the node the Pod was scheduled onto
+- `status.podIP`
+  - the Pod's internal cluster IP address
+- `metadata.labels['app']`
+  - the value of a specific label, when present
+- `metadata.annotations['some-key']`
+  - the value of a specific annotation, when present
+
+The important idea is that Kubernetes can inject selected Pod metadata into the container environment without you hard-coding those values into the image.
+
 This is a little more complicated than the first example, but it becomes very useful later because the response can reflect the actual Pod identity.
 
 Apply the richer Pod manifest:
