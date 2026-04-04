@@ -1,5 +1,7 @@
 # Part 3. Cluster usage examples
 
+This part takes the concepts from Part 2 and turns them into complete runnable examples. It matters because Kubernetes becomes much easier to understand when you can see how multiple objects work together to deliver something recognizable: a web page, an API behind a proxy, a richer frontend, or a stateful application with a database. The purpose of this part is to move from isolated concepts to working application patterns.
+
 ## 3.1 Static nginx web page using a ConfigMap
 
 This is the first frontend pattern in the tutorial.

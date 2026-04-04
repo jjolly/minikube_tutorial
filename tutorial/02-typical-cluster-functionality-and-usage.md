@@ -1,5 +1,7 @@
 # Part 2. Typical cluster functionality and usage
 
+This part introduces the Kubernetes objects and behaviors that form the day-to-day grammar of cluster work: Pods, Services, Deployments, namespaces, labels, configuration, secrets, and persistent storage. It matters because these are the building blocks used again and again in the application examples later in the tutorial. The goal here is to make the reader comfortable with the common patterns before those patterns are combined into larger systems.
+
 ## 2.1 Pods
 
 A **pod** is the smallest deployable unit in Kubernetes.

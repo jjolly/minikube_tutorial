@@ -1,5 +1,7 @@
 # Part 1. Installation and infrastructure
 
+This part gets the cluster into a usable state and gives the reader a first look at the core infrastructure that makes Kubernetes work. It matters because the rest of the tutorial assumes you have a functioning minikube environment and at least a basic mental model of the control plane, nodes, and cluster services. In other words, this part is about getting Kubernetes running and making the cluster feel less like a black box.
+
 ## 1.1 Installation
 
 ### 1.1.1 Prerequisites

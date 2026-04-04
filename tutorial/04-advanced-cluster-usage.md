@@ -1,5 +1,7 @@
 # Part 4. Advanced cluster usage
 
+This part is where the tutorial steps beyond the core walkthrough and shows the reader how to explore, troubleshoot, and extend a Kubernetes lab environment with more confidence. It matters because real understanding does not come only from following the happy path; it also comes from knowing how to diagnose failures, compare environments, experiment with optional features, and recognize where minikube fits within the larger Kubernetes landscape. The sections here are meant to help the reader grow from someone following examples into someone investigating and experimenting on purpose.
+
 ## 4.1 Cluster troubleshooting: what to check and which tools to use
 
 ## 4.2 RBAC
