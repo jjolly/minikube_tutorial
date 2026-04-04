@@ -21,15 +21,15 @@ spec:
         - |
           while true; do
             cat > /shared/index.html <<'EOF'
-<!doctype html>
-<html lang="en">
-  <head><meta charset="utf-8" /><title>sidecar demo</title></head>
-  <body>
-    <h1>Sidecar demo</h1>
-    <p>This page was written by the writer sidecar and served by nginx.</p>
-  </body>
-</html>
-EOF
+            <!doctype html>
+            <html lang="en">
+              <head><meta charset="utf-8" /><title>sidecar demo</title></head>
+              <body>
+                <h1>Sidecar demo</h1>
+                <p>This page was written by the writer sidecar and served by nginx.</p>
+              </body>
+            </html>
+            EOF
             sleep 30
           done
       volumeMounts:
