@@ -476,7 +476,86 @@ A good beginner habit is:
 - use `describe` for Kubernetes' explanation of what happened
 - use `logs` for the application's own output
 
-### 4.1.4 Diagnose Deployment rollout problems
+### 4.1.4 Using ephemeral debugging containers
+
+Sometimes logs and `describe` output are still not enough. You may want to look at the running Pod from the inside with tools that the original image does not contain.
+
+This is where **ephemeral containers** become useful.
+
+Important distinction:
+
+- in normal Kubernetes design, you do **not** edit a running Pod to add a regular application container
+- the main Pod containers are supposed to come from the Pod spec created at launch time
+- **ephemeral containers** are a special debugging feature that lets you attach a temporary debug container to an existing Pod
+
+So yes, Kubernetes does have a built-in way to add a container to a running Pod, but that mechanism is specifically for debugging. It is not the normal pattern for evolving application behavior in place.
+
+What ephemeral containers are good for:
+
+- inspecting the network namespace of a live Pod
+- checking shared filesystems or process state from inside the Pod context
+- using tools like `sh`, `wget`, `curl`, `ss`, `ip`, or `nslookup` when the original image is too minimal to include them
+- diagnosing problems in production-like images that are intentionally very small
+
+When to avoid or not rely on them:
+
+- when you actually need to change the workload design rather than debug it
+- when the cluster's security policy or RBAC rules do not allow ephemeral containers
+- when a normal `kubectl logs`, `kubectl describe`, or temporary debug Pod is already enough
+- when you are tempted to treat the ephemeral container as a permanent part of the application
+
+A few limitations to understand:
+
+- ephemeral containers are for debugging, not normal service traffic
+- they are not part of the original Pod's readiness/liveness design
+- they are not how you scale application logic
+- some environments may disable or restrict them
+- attaching one does not "fix" the Pod spec; it only gives you a way to inspect a running Pod more closely
+
+Useful command pattern:
+
+```bash
+kubectl debug -it pod/<pod-name> --image=nicolaka/netshoot --target=<container-name> -- sh
+```
+
+What this does:
+
+- attaches a temporary debug container to an existing Pod
+- uses the `nicolaka/netshoot` image, which contains many network-debugging tools
+- targets one of the original Pod containers so the debug session joins the right Pod context
+
+Simple demonstration with `sidecar-demo`:
+
+```bash
+kubectl debug -it pod/sidecar-demo --image=nicolaka/netshoot --target=web -- sh
+```
+
+Once inside the ephemeral container, useful checks include:
+
+```sh
+wget -qO- http://127.0.0.1
+ls -l /usr/share/nginx/html
+ip addr
+```
+
+Why this demonstration is useful:
+
+- `wget -qO- http://127.0.0.1` helps prove you are sharing the Pod network context
+- `ls -l /usr/share/nginx/html` helps you inspect what the nginx container is serving
+- `ip addr` helps show the Pod-facing network view from inside the debug container
+
+You can also use the same pattern against `echo-pod` when you want a minimal live target:
+
+```bash
+kubectl debug -it pod/echo-pod --image=nicolaka/netshoot --target=echo -- sh
+```
+
+A good rule of thumb is:
+
+- use a **temporary debug Pod** when you simply need another client somewhere in the cluster
+- use an **ephemeral container** when you need to inspect the inside of an already running Pod
+
+### 4.1.5 Diagnose Deployment rollout problems
 
 Deployments add another layer because Kubernetes is trying to maintain a desired number of Pods for you.
 
@@ -498,7 +577,7 @@ What these help you answer:
 
 This is especially useful when a Deployment exists but the application still does not seem reachable.
 
-### 4.1.5 Diagnose Service and networking problems
+### 4.1.6 Diagnose Service and networking problems
 
 If the Pods are healthy but traffic is not getting through, shift from workload troubleshooting to networking troubleshooting.
 
@@ -525,7 +604,7 @@ Typical failure patterns:
 - the application is listening on a different port than the Service expects
 - DNS or path assumptions are wrong
 
-### 4.1.6 Diagnose Ingress and HTTP routing problems
+### 4.1.7 Diagnose Ingress and HTTP routing problems
 
 If the Services work but HTTP routing still fails, inspect the ingress layer.
 
@@ -547,7 +626,7 @@ What these help you answer:
 
 A common beginner mistake is assuming an Ingress YAML problem when the real issue is that traffic is reaching the wrong port or host header.
 
-### 4.1.7 Diagnose storage and PVC problems
+### 4.1.8 Diagnose storage and PVC problems
 
 When storage is involved, check both the claim and the workload using it.
 
@@ -569,7 +648,7 @@ What these help you answer:
 
 This matters because sometimes a Pod looks broken when the real failure is that its storage never became available.
 
-### 4.1.8 High-value troubleshooting commands to remember
+### 4.1.9 High-value troubleshooting commands to remember
 
 If you only remember a short list, remember these:
 
@@ -580,6 +659,7 @@ kubectl get nodes -o wide
 kubectl get pods -A
 kubectl describe pod <pod-name> -n <namespace>
 kubectl logs <pod-name> -n <namespace>
+kubectl debug -it pod/<pod-name> --image=nicolaka/netshoot --target=<container-name> -- sh
 kubectl get svc -A
 kubectl get endpoints -A
 kubectl get ingress -A
@@ -589,7 +669,7 @@ kubectl get events -A --sort-by=.lastTimestamp
 
 These commands cover a surprisingly large percentage of beginner and intermediate cluster problems.
 
-### 4.1.9 Troubleshooting mindset
+### 4.1.10 Troubleshooting mindset
 
 A few habits will save you time:
 
