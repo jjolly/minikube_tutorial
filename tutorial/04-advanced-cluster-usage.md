@@ -264,6 +264,10 @@ Minikube usually differs from larger Kubernetes environments in several ways:
 - **team and operational context**
   - minikube is usually one person's environment
   - shared cluster governance, policy, audit, quotas, and organizational security models often matter much more in real deployments
+- **scaling consequences of Pod design**
+  - in production-oriented environments, Pod design choices become more operationally important
+  - if a Pod contains two tightly coupled containers and you scale that Pod template to three replicas, you are really running six containers in total
+  - that is fine when the containers truly belong together, but it is wasteful or awkward when the processes should really scale independently
 
 So the main mindset shift is:
 

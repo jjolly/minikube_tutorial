@@ -260,7 +260,7 @@ Hints:
 
 If you want to try it on your own first, stop here for a moment.
 
-The answer appears at the start of the next section, so you can check your work there if needed.
+The answer appears at the start of the Services section, so you can check your work there if needed.
 
 That little exercise is worth doing because it reinforces that Kubernetes is not doing anything magical yet. At this point, you are still reaching one specific Pod by its IP, just as before.
 
@@ -272,7 +272,145 @@ kubectl delete pod echo-pod
 
 That cleanup is intentional because the next sections rebuild the same idea using Services and then Deployments.
 
-## 2.7 Services
+## 2.7 Multi-container Pods and sidecars
+
+So far, every Pod in the tutorial has contained exactly one container. That is the most common beginner-friendly example, but Kubernetes Pods are allowed to run **more than one container**.
+
+This only makes sense when the containers are **tightly coupled**. In practice, that means they need to share something important enough that they really belong together in one Pod:
+
+- the same Pod IP address and network namespace
+- the same mounted volumes
+- the same basic lifecycle as one unit
+
+If two pieces of software are independent enough that you would want to scale, restart, or deploy them separately, they usually should **not** be placed in the same Pod.
+
+A classic example of a tightly coupled relationship is a **sidecar**. A sidecar container supports the main application container by doing something like:
+
+- writing or transforming files
+- shipping logs
+- handling local proxy duties
+- adapting data for another system
+
+### 2.7.1 Sidecar example: one container writes, one serves
+
+File: `config/01-pods/pod-sidecar-demo.yaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-demo
+  labels:
+    app: sidecar-demo
+spec:
+  containers:
+    - name: web
+      image: nginx:1.27-alpine
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-content
+          mountPath: /usr/share/nginx/html
+    - name: writer
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do
+            cat > /shared/index.html <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>sidecar demo</title></head>
+  <body>
+    <h1>Sidecar demo</h1>
+    <p>This page was written by the writer sidecar and served by nginx.</p>
+  </body>
+</html>
+EOF
+            sleep 30
+          done
+      volumeMounts:
+        - name: shared-content
+          mountPath: /shared
+  volumes:
+    - name: shared-content
+      emptyDir: {}
+```
+
+Apply it:
+
+```bash
+kubectl apply -f config/01-pods/pod-sidecar-demo.yaml
+kubectl get pod sidecar-demo -o wide
+kubectl describe pod sidecar-demo
+```
+
+What this demonstrates:
+
+- the Pod still has **one Pod IP**, even though it has two containers inside it
+- both containers share the same network namespace, so local networking is shared too
+- both containers share the same `emptyDir` volume
+- one container writes content to the shared volume, and the other serves that content over HTTP
+- both containers belong to the same Pod lifecycle
+
+One especially useful check is to access nginx from the **writer** container over `localhost`:
+
+```bash
+kubectl exec sidecar-demo -c writer -- wget -qO- http://127.0.0.1
+```
+
+Why this is interesting:
+
+- `writer` is not the nginx container
+- but it can still reach nginx over `127.0.0.1` because both containers share the Pod's network namespace
+
+Test the Pod from inside the cluster:
+
+```bash
+POD_IP=$(kubectl get pod sidecar-demo -o jsonpath='{.status.podIP}')
+kubectl run netshoot-sidecar-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP"
+```
+
+Expected response shape:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>sidecar demo</title></head>
+  <body>
+    <h1>Sidecar demo</h1>
+    <p>This page was written by the writer sidecar and served by nginx.</p>
+  </body>
+</html>
+```
+
+A few especially important details to notice:
+
+- Kubernetes reports the Pod IP, not a separate IP per container
+- both containers can see the same shared files because they mount the same volume
+- if you delete the Pod, both containers go away together
+
+For example:
+
+```bash
+kubectl delete pod sidecar-demo
+```
+
+That is a big part of the design lesson here: a multi-container Pod is one lifecycle unit, not a tiny cluster hiding inside a Pod.
+
+### 2.7.2 Another tightly coupled pattern
+
+A sidecar is not the only multi-container pattern. Another common one is sometimes called an **ambassador** or local proxy pattern, where one container acts as a closely coupled local proxy for the main application.
+
+The important point is not the name of the pattern. The important question is whether the containers truly belong together.
+
+A useful rule of thumb is:
+
+- if the containers must share the same network identity, volumes, and lifecycle, a multi-container Pod can make sense
+- if the containers should scale independently, roll out independently, or fail independently, they usually belong in separate Pods
+
+## 2.8 Services
 
 Pods are ephemeral. A **Service** gives a stable virtual IP and DNS name that can target one or more matching Pods.
 
@@ -519,6 +657,8 @@ A **Deployment** manages rollout for a stateless application.
 A standalone Pod is useful for learning, but it is not the usual way to keep an application running. A Deployment describes the desired state for a replaceable set of Pods and lets Kubernetes maintain that state for you.
 
 This example now keeps the self-identifying behavior from the earlier `echo-pod`. That means each replica created by the Deployment can answer with its own Pod name, which makes it much easier to see that the Service is sending traffic to a changing set of backend Pods rather than to one fixed machine.
+
+It is also worth connecting this to the earlier multi-container Pod discussion. Deployments scale **Pods**, not individual containers inside a Pod. That means if one Pod template contains two containers and you scale the Deployment to three replicas, Kubernetes will run three Pods and a total of six containers from that template. This is one reason multi-container Pods should be reserved for tightly coupled workloads rather than loosely related processes that ought to scale independently.
 
 File: `config/01-pods/deployment-echo.yaml`
 

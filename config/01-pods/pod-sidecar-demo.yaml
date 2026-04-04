@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-demo
+  labels:
+    app: sidecar-demo
+spec:
+  containers:
+    - name: web
+      image: nginx:1.27-alpine
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-content
+          mountPath: /usr/share/nginx/html
+    - name: writer
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do
+            cat > /shared/index.html <<'EOF'
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>sidecar demo</title></head>
+  <body>
+    <h1>Sidecar demo</h1>
+    <p>This page was written by the writer sidecar and served by nginx.</p>
+  </body>
+</html>
+EOF
+            sleep 30
+          done
+      volumeMounts:
+        - name: shared-content
+          mountPath: /shared
+  volumes:
+    - name: shared-content
+      emptyDir: {}
