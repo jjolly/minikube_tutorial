@@ -249,16 +249,20 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
       args:
-        - "-text=hello from $(POD_NAME)"
+        - "-text=hello from $(POD_NAME) at $(POD_IP)"
       ports:
         - containerPort: 5678
 ```
 
 What is new here:
 
-- `env` defines an environment variable named `POD_NAME`
-- `valueFrom.fieldRef.fieldPath: metadata.name` tells Kubernetes to fill that variable with the Pod's own name
+- `env` defines environment variables named `POD_NAME` and `POD_IP`
+- `valueFrom.fieldRef.fieldPath: metadata.name` tells Kubernetes to fill one variable with the Pod's own name
   - this `fieldRef` pattern is part of the Kubernetes **Downward API**, which lets a container learn selected information about the Pod it is running in
   - a few common `fieldPath` values worth knowing are:
     - `metadata.name`: the Pod's name
@@ -268,7 +272,8 @@ What is new here:
     - `metadata.labels['app']`: the value of a specific label, when present
     - `metadata.annotations['some-key']`: the value of a specific annotation, when present
   - the important idea is that Kubernetes can inject selected Pod metadata into the container environment without you hard-coding those values into the image
-- `args` now use Kubernetes variable expansion so `$(POD_NAME)` is resolved without requiring a shell inside the image
+- `valueFrom.fieldRef.fieldPath: status.podIP` tells Kubernetes to fill another variable with the Pod's internal cluster IP address
+- `args` now use Kubernetes variable expansion so `$(POD_NAME)` and `$(POD_IP)` are resolved without requiring a shell inside the image
 
 This is a little more complicated than the first example, but it becomes very useful later because the response can reflect the actual Pod identity.
 
@@ -481,7 +486,7 @@ kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never 
 Expected response:
 
 ```text
-hello from echo-pod
+hello from echo-pod at <pod-ip>
 ```
 
 If that worked, good — you have just confirmed that `echo-pod` is reachable from inside the cluster the same way the simpler Pod was.

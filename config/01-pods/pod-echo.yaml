@@ -13,7 +13,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
       args:
-        - "-text=hello from $(POD_NAME)"
+        - "-text=hello from $(POD_NAME) at $(POD_IP)"
       ports:
         - containerPort: 5678
