@@ -202,14 +202,17 @@ What just happened:
 Small mental model:
 
 ```text
-netshoot-pod-check
-        |
-        |  curl http://<simple-echo-pod-ip>:5678
-        v
- simple-echo-pod
-        |
-        v
-  returns: hello from simple-echo-pod
++-------------------------------------------------------------------+
+|                           Kubernetes Node                         |
+|                                                                   |
+|  +---------------------------+      HTTP GET      +-------------+ |
+|  |      Kubernetes Pod       |  ----------------> | Kubernetes  | |
+|  |     netshoot-pod-check    |                    |     Pod     | |
+|  | curl http://$POD_IP:5678  | <----------------  | simple-echo-| |
+|  +---------------------------+ hello from         |    pod      | |
+|                                      simple-echo- | HTTP Server | |
+|                                      pod          +-------------+ |
++-------------------------------------------------------------------+
 ```
 
 This is useful because it proves two things at once:
