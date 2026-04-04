@@ -181,11 +181,41 @@ Why this is written as two commands:
 - the first command asks Kubernetes for the Pod's current internal IP address
 - the second command starts a temporary helper Pod and uses it to send an HTTP request to that IP from inside the cluster network
 
+Why create `netshoot-pod-check` at all?
+
+Because at this point in the tutorial, `simple-echo-pod` is only a Pod with an internal cluster IP. It is not yet behind a Service, and it is not automatically exposed to your host machine. The easiest way to prove that the Pod is really serving HTTP is to launch another temporary Pod **inside the cluster** and let that Pod act as the client.
+
 Expected response:
 
 ```text
 hello from simple-echo-pod
 ```
+
+What just happened:
+
+- Kubernetes started a short-lived helper Pod from the `nicolaka/netshoot` image
+- that helper Pod ran `curl` against the internal IP of `simple-echo-pod`
+- the request stayed inside the cluster network
+- `simple-echo-pod` answered with the text configured in its container arguments
+- the helper Pod was removed automatically afterward because of `--rm`
+
+Small mental model:
+
+```text
+netshoot-pod-check
+        |
+        |  curl http://<simple-echo-pod-ip>:5678
+        v
+ simple-echo-pod
+        |
+        v
+  returns: hello from simple-echo-pod
+```
+
+This is useful because it proves two things at once:
+
+- the Pod is actually running an HTTP server
+- Pods inside the cluster can talk to each other over the cluster network
 
 Remove the simple example before moving on:
 
