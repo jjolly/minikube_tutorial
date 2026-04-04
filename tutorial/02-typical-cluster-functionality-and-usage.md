@@ -202,17 +202,16 @@ What just happened:
 Small mental model:
 
 ```text
-+-------------------------------------------------------------------+
-|                           Kubernetes Node                         |
-|                                                                   |
-|  +---------------------------+      HTTP GET      +-------------+ |
-|  |      Kubernetes Pod       |  ----------------> | Kubernetes  | |
-|  |     netshoot-pod-check    |                    |     Pod     | |
-|  | curl http://$POD_IP:5678  | <----------------  | simple-echo-| |
-|  +---------------------------+ hello from         |    pod      | |
-|                                      simple-echo- | HTTP Server | |
-|                                      pod          +-------------+ |
-+-------------------------------------------------------------------+
++------------------------------------------------------------------------+
+|                               Kubernetes Node                          |
+|                                                                        |
+| +--------------------------+     HTTP GET      +---------------------+ |
+| |      Kubernetes Pod      |  ---------------> |   Kubernetes Pod    | |
+| |    netshoot-pod-check    |                   |   simple-echo-pod   | |
+| |    netshoot container    |    hello from     | http-echo container | |
+| | curl http://$POD_IP:5678 | <---------------  |     HTTP Server     | |
+| +--------------------------+  simple-echo-pod  +---------------------+ |
++------------------------------------------------------------------------+
 ```
 
 This is useful because it proves two things at once:
