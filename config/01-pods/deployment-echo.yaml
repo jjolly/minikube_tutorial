@@ -24,10 +24,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          command:
-            - /bin/sh
-            - -c
           args:
-            - exec /http-echo -text="hello from ${POD_NAME}" -listen=:5678
+            - "-text=hello from $(POD_NAME)"
           ports:
             - containerPort: 5678

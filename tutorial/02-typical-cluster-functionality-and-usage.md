@@ -249,11 +249,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-      command:
-        - /bin/sh
-        - -c
       args:
-        - exec /http-echo -text="hello from ${POD_NAME}" -listen=:5678
+        - "-text=hello from $(POD_NAME)"
       ports:
         - containerPort: 5678
 ```
@@ -271,7 +268,7 @@ What is new here:
     - `metadata.labels['app']`: the value of a specific label, when present
     - `metadata.annotations['some-key']`: the value of a specific annotation, when present
   - the important idea is that Kubernetes can inject selected Pod metadata into the container environment without you hard-coding those values into the image
-- `command` and `args` now run a shell first so `${POD_NAME}` can be expanded before starting `http-echo`
+- `args` now use Kubernetes variable expansion so `$(POD_NAME)` is resolved without requiring a shell inside the image
 
 This is a little more complicated than the first example, but it becomes very useful later because the response can reflect the actual Pod identity.
 
