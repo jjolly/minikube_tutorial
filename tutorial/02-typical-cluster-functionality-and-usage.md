@@ -518,7 +518,7 @@ curl http://127.0.0.1:8080
 Expected response:
 
 ```text
-hello from echo-pod
+hello from echo-pod at <pod-ip>
 ```
 
 That response now comes through the Service rather than from manually targeting the Pod IP.
@@ -554,7 +554,7 @@ What this command is doing:
 Expected response:
 
 ```text
-hello from echo-pod
+hello from echo-pod at <pod-ip>
 ```
 
 The important idea is that cluster-internal name resolution is now doing work for you.
