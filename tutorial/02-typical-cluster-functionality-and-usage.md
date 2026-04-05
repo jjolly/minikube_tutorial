@@ -474,23 +474,6 @@ spec:
       targetPort: 5678
 ```
 
-### 2.8 Answer to the section 2.5 challenge
-
-If you tried the challenge from the previous section, the adapted command sequence looks like this:
-
-```bash
-POD_IP=$(kubectl get pod echo-pod -o jsonpath='{.status.podIP}')
-kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
-```
-
-Expected response:
-
-```text
-hello from echo-pod at <pod-ip>
-```
-
-If that worked, good — you have just confirmed that `echo-pod` is reachable from inside the cluster the same way the simpler Pod was.
-
 Recreate the Pod first:
 
 ```bash

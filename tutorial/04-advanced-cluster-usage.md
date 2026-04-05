@@ -944,8 +944,10 @@ kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never 
 Expected shape of response:
 
 ```text
-hello from echo-pod
+hello from echo-pod at <pod-ip>
 ```
+
+If that worked, you confirmed that `echo-pod` is reachable from inside the cluster the same way the simpler Pod was.
 
 ### 4.8.2 Namespace default challenge from section 2.11
 
