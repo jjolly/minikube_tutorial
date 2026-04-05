@@ -528,15 +528,31 @@ That response now comes through the Service rather than from manually targeting 
 Kubernetes networking is built around a few expectations:
 
 ```text
-Pod A  --DNS lookup-->  Service name
-  |                      |
-  |------HTTP/TCP------> Service virtual IP
-                         |
-                         v
-                      backend Pod
+DNS lookup
+
++------------------+        query: echo-service        +------------------+
+| netshoot Pod     | --------------------------------> | cluster DNS      |
+| temporary client | <-------------------------------- | returns Service  |
++------------------+        reply: Service IP          +------------------+
+
+HTTP flow
+
++------------------+      request to Service name/IP   +------------------+
+| netshoot Pod     | --------------------------------> | echo-service     |
+| temporary client | <-------------------------------- | stable front door|
++------------------+      response via same path       +---------+--------+
+                                                               |
+                                                               | forwards / load-balances
+                                                               v
+                                                        +------------------+
+                                                        | backend Pod       |
+                                                        | echo-pod          |
+                                                        +------------------+
 ```
 
 This section demonstrates the idea that workloads inside the cluster usually talk to each other through Service names, not by discovering individual Pod IP addresses by hand.
+
+A Service gives clients a stable name and virtual IP, but it is not itself the backend application. Instead, Kubernetes uses the Service definition as routing and load-balancing configuration: traffic sent to the Service is forwarded to one of the Pods selected by that Service.
 
 Start a temporary helper Pod and test DNS plus HTTP in one shot:
 
