@@ -531,6 +531,13 @@ Forward the Service port to your local machine:
 kubectl port-forward service/echo-service 8080:80
 ```
 
+Why this step is needed here:
+
+- the Service exists inside the Kubernetes cluster network, not automatically on your host machine
+- `kubectl port-forward` creates a temporary tunnel from your local machine to the Service inside the cluster
+- that lets you test the Service from your browser or with local `curl` without creating an external exposure method such as a NodePort, LoadBalancer, or Ingress
+- if you did **not** use `port-forward`, you would usually need to test from inside the cluster with another Pod, or you would need to expose the Service using some other Kubernetes networking method
+
 Important timing note:
 
 - this command keeps running in the foreground
