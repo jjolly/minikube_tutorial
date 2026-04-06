@@ -381,6 +381,22 @@ spec:
       emptyDir: {}
 ```
 
+What is new here:
+
+- `containers` now contains **two container definitions** instead of one
+- `name: web` names the nginx container that serves the page
+- `image: nginx:1.27-alpine` uses nginx as a lightweight web server
+- `ports.containerPort: 80` declares the port nginx listens on inside the container
+- `volumeMounts` appears for the first time and mounts shared storage into a container
+- `mountPath: /usr/share/nginx/html` places that shared storage at nginx's default web root
+- `name: writer` names the helper sidecar container
+- `image: busybox:1.36` uses a small image to run a simple shell loop
+- `command` overrides the container's default startup command
+- the shell loop writes HTML into `/shared/index.html` every 30 seconds
+- the second `volumeMounts` entry mounts the same shared storage into the writer container at `/shared`
+- `volumes` defines storage available to the Pod as a whole
+- `emptyDir: {}` creates temporary Pod-local storage that both containers can share for as long as the Pod exists
+
 Apply it:
 
 ```bash
@@ -473,6 +489,15 @@ spec:
     - port: 80
       targetPort: 5678
 ```
+
+What is new here:
+
+- `kind: Service` creates a stable network endpoint in front of matching Pods
+- `metadata.name: echo-service` gives the Service its name
+- `selector.app: echo` tells the Service to send traffic to Pods with the label `app: echo`
+- `ports` defines how the Service listens and forwards traffic
+- `port: 80` exposes the Service on port 80
+- `targetPort: 5678` forwards that traffic to port 5678 on the selected Pods
 
 Recreate the Pod first:
 
@@ -587,6 +612,12 @@ kind: Namespace
 metadata:
   name: tutorial
 ```
+
+What is new here:
+
+- `kind: Namespace` creates a separate logical space inside the cluster
+- `metadata.name: tutorial` names that namespace `tutorial`
+- resources created in this namespace are kept separate from resources in `default` and other namespaces
 
 Create the namespace:
 
@@ -740,6 +771,23 @@ spec:
             - containerPort: 5678
 ```
 
+What is new here:
+
+- `apiVersion: apps/v1` uses the Kubernetes API group for controller-managed workloads
+- `kind: Deployment` creates a Deployment rather than a standalone Pod
+- `metadata.name: echo-deployment` names the Deployment
+- `metadata.labels.app: echo` labels the Deployment object itself
+- `spec.replicas: 2` asks Kubernetes to keep two Pod replicas running
+- `selector.matchLabels.app: echo` tells the Deployment which Pods belong to it
+- `template` defines the Pod template used to create each replica
+- `template.metadata.labels` applies labels to every Pod created by this Deployment
+- `tier: demo` and `lesson: deployments` are extra descriptive labels for filtering and organization
+- `containers` defines the container each replica will run
+- `env.valueFrom.fieldRef.fieldPath: metadata.name` fills `POD_NAME` with each Pod's own name
+- `command` starts a shell explicitly inside the container
+- `args` tell the echo server to reply with the Pod name and listen on port 5678
+- `ports.containerPort: 5678` declares the application port inside each container
+
 Remove the earlier standalone Pod:
 
 ```bash
@@ -848,6 +896,15 @@ stringData:
   password: super-secret-value
 ```
 
+What is new here:
+
+- `kind: Secret` creates a Kubernetes object for sensitive values
+- `metadata.name: example-secret` gives the Secret its name
+- `metadata.namespace: tutorial` places the Secret in the `tutorial` namespace
+- `type: Opaque` means this is a general-purpose Secret
+- `stringData` lets you provide secret values as plain text in the manifest
+- `username` and `password` are the keys stored in that Secret
+
 Apply the Secret:
 
 ```bash
@@ -896,6 +953,15 @@ data:
   index.html: |
     <h1>Hello from a ConfigMap</h1>
 ```
+
+What is new here:
+
+- `kind: ConfigMap` creates a Kubernetes object for non-secret configuration
+- `metadata.name: example-config` gives the ConfigMap its name
+- `metadata.namespace: tutorial` places it in the `tutorial` namespace
+- `data` stores ordinary key/value configuration entries
+- `app-mode: tutorial` stores a simple configuration value
+- `index.html: |` stores a small multiline text file inside the ConfigMap
 
 ConfigMaps are useful for small files, app settings, and simple tutorial content.
 
@@ -958,6 +1024,23 @@ spec:
           persistentVolumeClaim:
             claimName: demo-shared-data
 ```
+
+What is new here:
+
+- `kind: PersistentVolumeClaim` creates a request for persistent storage
+- `metadata.name: demo-shared-data` gives the storage claim its name
+- `metadata.namespace: tutorial` places that claim in the `tutorial` namespace
+- `accessModes: ReadWriteOnce` asks for storage that can be mounted read-write by one node at a time
+- `resources.requests.storage: 1Gi` requests 1 GiB of storage
+- `---` separates the PVC manifest from the Deployment manifest in the same file
+- the second `kind: Deployment` creates the workload that will use that storage
+- `metadata.name: pvc-demo` names the Deployment
+- `spec.replicas: 1` keeps one Pod replica running
+- `selector.matchLabels.app: pvc-demo` tells the Deployment which Pods belong to it
+- `template.metadata.labels.app: pvc-demo` gives the Pod the label that matches the selector
+- `containers[0].command` runs a shell script that creates a file if it does not already exist
+- `volumeMounts.mountPath: /data` makes the mounted storage available inside the container at `/data`
+- `volumes.persistentVolumeClaim.claimName: demo-shared-data` connects the Pod to the PVC created earlier in the file
 
 Apply it:
 
