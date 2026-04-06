@@ -691,6 +691,7 @@ What these commands show:
 
 - the first prints the name of the currently selected kubeconfig context
 - the second shows the currently active cluster, user, and namespace settings in a smaller view
+- `--minify` tells `kubectl config view` to show only the configuration associated with the current context instead of dumping every cluster, user, and context in the kubeconfig file
 
 Set the current context to default to the `tutorial` namespace:
 
