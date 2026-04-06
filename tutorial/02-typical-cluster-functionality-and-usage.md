@@ -636,6 +636,29 @@ Create the namespace:
 kubectl apply -f config/01-pods/namespace-tutorial.yaml
 ```
 
+List all namespaces in the cluster:
+
+```bash
+kubectl get namespaces
+```
+
+You will usually see several namespaces that already exist before you create your own.
+
+Common namespaces to recognize:
+
+- `default`
+  - the default namespace for namespaced resources when you do not specify a different one
+- `kube-system`
+  - used for core Kubernetes system components such as DNS, control-plane helpers, and addon-related system Pods
+- `kube-public`
+  - a special namespace traditionally used for cluster information that may be readable by all users
+- `kube-node-lease`
+  - used for node lease objects that help Kubernetes track node heartbeats efficiently
+- `ingress-nginx`
+  - commonly created when the NGINX ingress addon or controller is installed; it contains the ingress controller resources rather than your application workloads
+
+The important idea is that not every namespace is meant for application code. Some exist so Kubernetes and its addons can organize their own components separately from user workloads.
+
 Move the echo resources into it:
 
 ```bash
