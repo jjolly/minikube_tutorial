@@ -396,6 +396,8 @@ What is new here:
 - the second `volumeMounts` entry mounts the same shared storage into the writer container at `/shared`
 - `volumes` defines storage available to the Pod as a whole
 - `emptyDir: {}` creates temporary Pod-local storage that both containers can share for as long as the Pod exists
+- the `{}` is an empty YAML map, which means `emptyDir` is being used with its default settings rather than with extra options
+- it is empty here because this example only needs the basic behavior: Kubernetes should create an empty temporary directory for the Pod without setting things like a size limit or memory-backed storage
 
 Apply it:
 
