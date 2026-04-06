@@ -536,7 +536,9 @@ Why this step is needed here:
 - the Service exists inside the Kubernetes cluster network, not automatically on your host machine
 - `kubectl port-forward` creates a temporary tunnel from your local machine to the Service inside the cluster
 - that lets you test the Service from your browser or with local `curl` without creating an external exposure method such as a NodePort, LoadBalancer, or Ingress
+- this makes `port-forward` a good fit for quick access during a tutorial, but production-oriented systems usually rely on a more durable exposure method such as a load balancer or ingress path instead
 - if you did **not** use `port-forward`, you would usually need to test from inside the cluster with another Pod, or you would need to expose the Service using some other Kubernetes networking method
+- for one example of a production-style exposure method, see **Part 4, section 4.6.3, "AKS example: exposing a Service with `type: LoadBalancer`"**
 
 Important timing note:
 

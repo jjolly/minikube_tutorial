@@ -301,6 +301,62 @@ What to expect if you later move from minikube to a managed service:
 - infrastructure objects and integrations become more provider-specific
 - operational concerns shift toward cloud permissions, networking, and managed-service behavior
 
+##### AKS example: exposing a Service with `type: LoadBalancer`
+
+One of the clearest differences between a local minikube lab and a managed cloud environment is how you expose an application.
+
+In Part 2, section 2.8 used `kubectl port-forward` because it is a quick and low-friction way to reach a Service from your local machine during a tutorial. In a production-oriented environment such as **Azure Kubernetes Service (AKS)**, a more typical pattern is to create a Service of type `LoadBalancer` and let the cloud provider allocate an external frontend for it.
+
+Example file: `config/advanced/service-echo-aks-loadbalancer.yaml`
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-service-lb
+  namespace: tutorial
+spec:
+  type: LoadBalancer
+  selector:
+    app: echo
+  ports:
+    - port: 80
+      targetPort: 5678
+```
+
+What is new here:
+
+- `kind: Service` still creates a Service, just as in Part 2
+- `metadata.name: echo-service-lb` gives this Service a distinct name
+- `metadata.namespace: tutorial` places it in the `tutorial` namespace
+- `spec.type: LoadBalancer` asks AKS to provision an external load balancer for this Service
+- `selector.app: echo` tells the Service to send traffic to Pods with the label `app: echo`
+- `port: 80` exposes the Service on port 80
+- `targetPort: 5678` forwards that traffic to port 5678 on the selected Pods
+
+Apply it:
+
+```bash
+kubectl apply -f config/advanced/service-echo-aks-loadbalancer.yaml
+kubectl get service echo-service-lb -n tutorial
+```
+
+What to look for:
+
+- the `TYPE` column should show `LoadBalancer`
+- the `EXTERNAL-IP` field may begin as `<pending>` while AKS asks Azure to provision the load balancer resources
+- once provisioning finishes, the Service should receive a public IP address
+
+Why this is different from `port-forward`:
+
+- `port-forward` creates a temporary tunnel from your current machine through `kubectl`
+- a `LoadBalancer` Service asks the cloud platform to create infrastructure that can receive traffic independently of your current shell session
+- this is much closer to how production systems are commonly exposed
+
+A practical note:
+
+- this pattern depends on cloud-provider integration, so it is normal in AKS, but it does **not** behave the same way in a plain local minikube cluster unless you separately add tooling such as MetalLB or use a different exposure method
+
 #### Self-managed Kubernetes on servers or VMs
 
 Examples include clusters built with:
