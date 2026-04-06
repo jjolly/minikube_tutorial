@@ -1002,7 +1002,70 @@ ConfigMaps are useful for small files, app settings, and simple tutorial content
 
 ## 2.19 Persistent Volumes and PersistentVolumeClaims
 
-A **PersistentVolumeClaim** requests durable storage for a workload.
+A **PersistentVolume (PV)** represents storage made available to the cluster. A **PersistentVolumeClaim (PVC)** is a request to use some of that storage.
+
+That difference matters:
+
+- a **PV** is the storage resource itself, or at least Kubernetes' representation of it
+- a **PVC** is what a workload asks for when it needs storage
+- a Pod usually uses storage by referencing a **PVC**, not by referencing a PV directly
+
+A useful mental model is:
+
+- **PV** = supply
+- **PVC** = demand
+
+When a PVC is created, Kubernetes tries to bind it to a suitable PV.
+
+There are two broad ways that can happen:
+
+- **dynamic provisioning**
+  - this is common in environments like minikube or managed cloud clusters
+  - a storage provisioner automatically creates backing storage when a PVC is requested
+  - this is the most convenient path for tutorials because you do not need to define the PV yourself first
+- **static provisioning**
+  - an administrator creates a PV ahead of time
+  - later, a PVC can bind to that existing PV if the request matches what the PV offers
+  - this is more common when you want tighter control over existing storage or specific storage characteristics
+
+A simple example of a manually defined PV looks like this:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: demo-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /data/demo-pv
+```
+
+What this PV example means:
+
+- `kind: PersistentVolume` creates a cluster storage resource
+- `capacity.storage: 1Gi` says the PV offers 1 GiB of storage
+- `accessModes: ReadWriteOnce` describes how it can be mounted
+- `hostPath` uses a directory on the node itself as the backing storage
+
+That `hostPath` pattern is useful for a simple lab, but it is not usually the right storage approach for production systems.
+
+Other ways PVs can be backed include:
+
+- local node disks
+- NFS or other network filesystems
+- cloud block storage provided by platforms such as Azure, AWS, or Google Cloud
+- CSI-based storage drivers that integrate Kubernetes with external storage systems
+
+How a PVC uses a PV:
+
+- the PVC asks for storage size and access characteristics
+- Kubernetes looks for a matching PV, or asks a provisioner to create one dynamically
+- once the PVC is bound, a Pod can mount that claim as a volume
+- the Pod uses the mounted storage without needing to know the implementation details of the underlying PV
 
 This is worth introducing as a core concept before the database examples, because it demonstrates a central Kubernetes idea: a Pod can go away while the storage survives.
 
