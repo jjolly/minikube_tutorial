@@ -89,7 +89,7 @@ What to look for:
 
 That timing difference is useful. It shows that a Pod can exist for a short task, not only for long-running servers, and that Kubernetes keeps status information about the finished Pod for later inspection.
 
-Clean up the Pod:
+### Clean up
 
 ```bash
 kubectl delete pod bb-demo
@@ -219,7 +219,7 @@ This is useful because it proves two things at once:
 - the Pod is actually running an HTTP server
 - Pods inside the cluster can talk to each other over the cluster network
 
-Remove the simple example before moving on:
+### Clean up
 
 ```bash
 kubectl delete pod simple-echo-pod
@@ -307,7 +307,7 @@ A possible answer appears later in the exercise notes section in **Part 4, secti
 
 That little exercise is worth doing because it reinforces that Kubernetes is not doing anything magical yet. At this point, you are still reaching one specific Pod by its IP, just as before.
 
-Then clean up the standalone Pod before moving on:
+### Clean up
 
 ```bash
 kubectl delete pod echo-pod
@@ -452,7 +452,7 @@ A few especially important details to notice:
 - both containers can see the same shared files because they mount the same volume
 - if you delete the Pod, both containers go away together
 
-For example:
+### Clean up
 
 ```bash
 kubectl delete pod sidecar-demo
@@ -971,6 +971,14 @@ What to notice:
 
 This simple example is enough to make the journal database manifests later feel less surprising.
 
+### Clean up
+
+If you do not want to keep this example Secret in the cluster, remove it:
+
+```bash
+kubectl delete secret example-secret -n tutorial
+```
+
 ## 2.18 ConfigMaps
 
 A **ConfigMap** stores non-secret configuration data.
@@ -1164,6 +1172,16 @@ What this demonstrates:
 - the storage survived Pod replacement
 
 That is the core idea you will rely on later when SQL Server stores durable data.
+
+### Clean up
+
+If you do not want to keep this demo workload and claim after the exercise, remove them with:
+
+```bash
+kubectl delete -f config/01-pods/pvc-demo.yaml
+```
+
+If your storage class uses `Delete` reclaim behavior, the backing storage is usually removed automatically when the claim is deleted. In other environments, cleanup behavior can differ.
 
 ### 2.21 Why this matters later
 

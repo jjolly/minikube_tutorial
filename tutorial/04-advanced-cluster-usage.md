@@ -57,6 +57,14 @@ kubectl auth can-i create deployments --as=system:serviceaccount:tutorial:tutori
 
 The second command should print `no`.
 
+### Clean up
+
+If you do not want to keep this RBAC example, remove it with:
+
+```bash
+kubectl delete -f config/05-journal/12-rbac-readonly.yaml
+```
+
 ## 4.3 Minikube profiles
 
 So far, the tutorial has treated minikube as if there were only one cluster. That is the right simplification for the main walkthrough. But minikube can manage more than one local cluster by using **profiles**.
@@ -99,6 +107,14 @@ Important idea:
 That means profiles are useful when you want stronger separation than a namespace can give. For example, you might use namespaces to separate tutorial resources from other workloads inside one cluster, but use profiles when you want completely independent clusters with different lifecycle, storage, addons, or experiments.
 
 For this tutorial, you do not need profiles to succeed. But once you start revisiting the tutorial, they can be a practical way to keep a clean lab environment without interfering with other minikube work.
+
+### Clean up
+
+If you created the example profile and no longer need it, remove it with:
+
+```bash
+minikube delete -p tutorial-lab
+```
 
 ## 4.4 Multi-node minikube clusters
 
@@ -182,6 +198,20 @@ What to observe:
 - even when the image and template are identical, the scheduler can spread work across nodes instead of packing everything into one place
 
 This is one of the first moments where the abstract idea of "a cluster has multiple nodes" starts to feel concrete.
+
+### Clean up
+
+If you only created the sample Deployment for observation, remove it with:
+
+```bash
+kubectl delete deployment hello-multi
+```
+
+If you are done with the entire multi-node lab, you can remove the profile with:
+
+```bash
+minikube delete -p multinode-lab
+```
 
 ### 4.4.5 Important limitations of this experience
 
@@ -356,6 +386,14 @@ Why this is different from `port-forward`:
 A practical note:
 
 - this pattern depends on cloud-provider integration, so it is normal in AKS, but it does **not** behave the same way in a plain local minikube cluster unless you separately add tooling such as MetalLB or use a different exposure method
+
+###### Clean up
+
+If you only created this AKS-style example for testing, remove it with:
+
+```bash
+kubectl delete -f config/advanced/service-echo-aks-loadbalancer.yaml
+```
 
 #### Self-managed Kubernetes on servers or VMs
 

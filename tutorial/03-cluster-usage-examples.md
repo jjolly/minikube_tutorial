@@ -59,6 +59,14 @@ This stage is useful because it shows three layers working together:
 2. a Deployment runs nginx and mounts that content
 3. a Service gives you a stable way to reach the nginx Pod
 
+### Clean up
+
+If you are done with this example before moving on, remove it with:
+
+```bash
+kubectl delete -f config/02-static-nginx/static-site.yaml
+```
+
 ## 3.2 Basic Flask `/genkey` service behind nginx
 
 This stage introduces a reverse proxy and service-to-service routing.
@@ -145,6 +153,14 @@ If you later want a safer interactive Flask example, good alternatives would be:
 - hash or encoding demonstrations
 - simple text transformation APIs
 
+### Clean up
+
+If you do not want to keep this basic genkey example running, remove it with:
+
+```bash
+kubectl delete -f config/03-genkey-basic/genkey-basic.yaml
+```
+
 ## 3.4 Richer frontend: built image instead of ConfigMap assets
 
 Now revisit frontend delivery with a better packaging model.
@@ -210,6 +226,14 @@ This stage matters because it shows the contrast between:
 2. a built frontend image
 
 For a richer frontend, the image-based approach is usually cleaner and more realistic.
+
+### Clean up
+
+If you are done comparing this image-based example, remove it with:
+
+```bash
+kubectl delete -f config/04-genkey-full/image-based/
+```
 
 ## 3.5 Journal application, first approach: schema init inside API startup
 
@@ -322,6 +346,14 @@ Expected response:
 
 That `autoMigrate: true` value matters. It tells you the API is still doing schema work during startup.
 
+### Clean up
+
+Before moving to the improved version, remove the first-step manifests:
+
+```bash
+kubectl delete -f config/05-journal/step1-startup-init/
+```
+
 ## 3.9 Journal application, improved approach: dedicated database-init Job
 
 Now split schema initialization away from the API.
@@ -347,13 +379,9 @@ nginx web Pod  -- /journal/api -->  Service/journal-api  -->  C# API Pod
 - better security posture
 - better cluster deployment strategy
 
-If you already ran the startup-init version, remove it before applying the improved version:
+If you already ran the startup-init version, remove it before applying the improved version.
 
-```bash
-kubectl delete -f config/05-journal/step1-startup-init/
-```
-
-This cleanup matters because the improved version recreates some of the same application pieces with a different initialization strategy.
+That cleanup matters because the improved version recreates some of the same application pieces with a different initialization strategy.
 
 Apply the improved manifests:
 
@@ -405,6 +433,14 @@ Expected response:
 ```
 
 That `autoMigrate: false` value matters. It tells you schema work has been moved out of the API startup path.
+
+### Clean up
+
+If you do not want to keep the improved journal example running, remove it with:
+
+```bash
+kubectl delete -f config/05-journal/step2-job-init/
+```
 
 ## 3.11 Ingress in the application example
 
@@ -488,5 +524,15 @@ curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
 ```
 
 This is the final proof that a single ingress entrypoint can route to multiple backend Services by path.
+
+### Clean up
+
+If you only wanted to test the Ingress example, remove the Ingress object with:
+
+```bash
+kubectl delete -f config/05-journal/13-ingress.yaml
+```
+
+If you also want to remove the backend applications, delete the corresponding manifests from the earlier sections as well.
 
 ---
