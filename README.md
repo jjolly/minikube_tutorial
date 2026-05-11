@@ -1,10 +1,11 @@
-# Minikube Tutorial: Modular Guide
+# Kubernetes Tutorial: Modular Guide
 
 This tutorial has been split into modules so it is easier to work through in stages.
 
-The original material is organized into four parts:
+The original material is organized into five parts:
 
-1. **Installation and infrastructure**
+0. **Cluster Setup** - Choose your local Kubernetes environment (Docker Desktop or Minikube)
+1. **Infrastructure and kubectl** - Learn about the Kubernetes control plane, nodes, and core services
 2. **Typical cluster functionality and usage**
 3. **Cluster usage examples**
 4. **Advanced cluster usage**
@@ -13,7 +14,7 @@ Use this file as the entry point, then open the module you want.
 
 ## What you are building and why
 
-Minikube gives you a local Kubernetes cluster you can experiment with safely. On WSL, that means you can learn the Kubernetes object model and application deployment flow without renting cloud infrastructure first.
+This tutorial gives you a local Kubernetes cluster you can experiment with safely. You can learn the Kubernetes object model and application deployment flow without renting cloud infrastructure first.
 
 The goal of this tutorial is to show not only how to run things, but also how to reason about why Kubernetes uses these objects and patterns.
 
@@ -32,7 +33,8 @@ This section helps you find the files used by the tutorial while you work.
 
 ```text
 tutorial/
-  01-installation-and-infrastructure.md
+  00-cluster-setup.md
+  01-infrastructure-and-kubectl.md
   02-typical-cluster-functionality-and-usage.md
   03-cluster-usage-examples.md
   04-advanced-cluster-usage.md
@@ -53,29 +55,36 @@ config/
 
 How to use this layout:
 
-- `tutorial/` contains the four tutorial modules.
+- `tutorial/` contains the five tutorial modules.
 - `src/` contains application source code and other source-stage materials used by the examples.
 - `config/` contains Kubernetes manifests used by the tutorial.
 - the `01-` / `02-` / `03-` numbering in `src/` and `config/` represents **tutorial stage order**, not part number.
 - `src/01-pods/` is present as a placeholder/explanation stage because the earliest examples use stock public images rather than custom application source code.
 - `config/05-journal/step1-startup-init/` contains the first database-init approach.
 - `config/05-journal/step2-job-init/` contains the improved database-init approach.
-- if you want a full tutorial reset, use `minikube delete` and then continue again from section `1.9` in Part 1.
+- if you want a full tutorial reset, see the reset instructions in **Part 0** for your chosen cluster type.
 
 ## Modules
 
-- [Part 1. Installation and infrastructure](tutorial/01-installation-and-infrastructure.md)
+- [Part 0. Cluster Setup](tutorial/00-cluster-setup.md) - Choose Docker Desktop or Minikube
+- [Part 1. Infrastructure and kubectl](tutorial/01-infrastructure-and-kubectl.md)
 - [Part 2. Typical cluster functionality and usage](tutorial/02-typical-cluster-functionality-and-usage.md)
 - [Part 3. Cluster usage examples](tutorial/03-cluster-usage-examples.md)
 - [Part 4. Advanced cluster usage](tutorial/04-advanced-cluster-usage.md)
 
 ## Suggested reading order
 
-If you are new to Kubernetes, read the modules in order.
+If you are new to Kubernetes, read the modules in order:
+
+1. Start with **Part 0** to set up your cluster (choose Docker Desktop or Minikube)
+2. Continue with **Part 1** to understand Kubernetes infrastructure
+3. Work through **Parts 2 and 3** for core concepts and examples
+4. Explore **Part 4** for advanced topics
 
 If you are revisiting the tutorial later:
 
-- start with **Part 1** if you need cluster setup or infrastructure refreshers
+- start with **Part 0** if you need a different cluster setup
+- jump to **Part 1** if you need infrastructure refreshers
 - jump to **Part 2** if you want core Kubernetes object behavior
 - jump to **Part 3** if you want application-focused examples
 - jump to **Part 4** if you want RBAC, gateway alternatives, or exercise notes

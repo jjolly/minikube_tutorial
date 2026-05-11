@@ -89,8 +89,16 @@ Service/genkey-basic-api
 Flask API Pod
 ```
 
-Build the API image into minikube:
+Build the API image.
 
+**Docker Desktop:**
+```bash
+cd src/03-genkey-basic
+docker build -t genkey-basic-api:0.1.0 .
+cd ../..
+```
+
+**Minikube:**
 ```bash
 cd src/03-genkey-basic
 minikube image build -t genkey-basic-api:0.1.0 .
@@ -100,7 +108,9 @@ cd ../..
 Why this is written as a small sequence:
 
 - first you move into the directory that contains the Docker build context
-- then `minikube image build` builds the image directly into minikube's image store
+- then you build the image
+  - Docker Desktop: images are immediately available to the cluster
+  - Minikube: `minikube image build` builds the image directly into minikube's image store
 - finally you return to the repository root so later commands match the file paths shown in the tutorial
 
 Apply the Kubernetes manifests:
@@ -177,15 +187,30 @@ nginx frontend Pod  -- /genkey/api -->  Service/genkey-api  -->  Flask API Pod
   '-- /genkey/ --> serves built React frontend files
 ```
 
-Build the backend image first:
+Build the backend image first.
 
+**Docker Desktop:**
+```bash
+cd src/04-genkey-full/backend
+docker build -t genkey-api:0.1.0 .
+```
+
+**Minikube:**
 ```bash
 cd src/04-genkey-full/backend
 minikube image build -t genkey-api:0.1.0 .
 ```
 
-Then build the frontend image:
+Then build the frontend image.
 
+**Docker Desktop:**
+```bash
+cd ..
+docker build -f Dockerfile.frontend -t genkey-web:0.1.0 .
+cd ../..
+```
+
+**Minikube:**
 ```bash
 cd ..
 minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
@@ -265,8 +290,16 @@ This approach is **not optimal** because the API runtime needs broader database 
 
 ### 3.8 Apply the first-step manifests in phases
 
-Build the journal API image:
+Build the journal API image.
 
+**Docker Desktop:**
+```bash
+cd src/05-journal/api
+docker build -t journal-api:0.1.0 .
+cd ../../..
+```
+
+**Minikube:**
 ```bash
 cd src/05-journal/api
 minikube image build -t journal-api:0.1.0 .
@@ -275,7 +308,7 @@ cd ../../..
 
 Why start with the image build?
 
-Because the cluster cannot run the journal API Deployment until the image exists in minikube.
+Because the cluster cannot run the journal API Deployment until the image exists.
 
 Apply the Secret, PVC, database Deployment, and database Service first.
 
@@ -491,8 +524,17 @@ Inspect it:
 kubectl get ingress -n tutorial
 ```
 
-Get the minikube IP and the ingress controller's NodePort:
+Get the ingress controller's NodePort.
 
+**Docker Desktop:**
+```bash
+NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
+echo "$NODEPORT"
+```
+
+For Docker Desktop, you can access the ingress via `localhost`.
+
+**Minikube:**
 ```bash
 MINIKUBE_IP=$(minikube ip)
 NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
@@ -500,10 +542,12 @@ echo "$MINIKUBE_IP"
 echo "$NODEPORT"
 ```
 
+For Minikube, you need both the IP and the NodePort.
+
 Why this is split out:
 
 - the Ingress object defines routing rules
-- these extra commands discover how the ingress controller is actually reachable in your local minikube environment
+- these extra commands discover how the ingress controller is actually reachable in your local environment
 
 ### 3.13 Small challenge
 
@@ -515,8 +559,16 @@ Before you run the three `curl` commands below, look at the Ingress manifest and
 
 That is a useful habit in Kubernetes: read the routing rule first, then test whether the live system behaves the way you expected.
 
-Test the routes with the expected host header:
+Test the routes with the expected host header.
 
+**Docker Desktop:**
+```bash
+curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/"
+curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/api"
+curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/journal/"
+```
+
+**Minikube:**
 ```bash
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"

@@ -1,6 +1,6 @@
 # Part 4. Advanced cluster usage
 
-This part is where the tutorial steps beyond the core walkthrough and shows the reader how to explore, troubleshoot, and extend a Kubernetes lab environment with more confidence. It matters because real understanding does not come only from following the happy path; it also comes from knowing how to diagnose failures, compare environments, experiment with optional features, and recognize where minikube fits within the larger Kubernetes landscape. The sections here are meant to help the reader grow from someone following examples into someone investigating and experimenting on purpose.
+This part is where the tutorial steps beyond the core walkthrough and shows the reader how to explore, troubleshoot, and extend a Kubernetes lab environment with more confidence. It matters because real understanding does not come only from following the happy path; it also comes from knowing how to diagnose failures, compare environments, experiment with optional features, and recognize where local clusters fit within the larger Kubernetes landscape. The sections here are meant to help the reader grow from someone following examples into someone investigating and experimenting on purpose.
 
 ## 4.1 Cluster troubleshooting: what to check and which tools to use
 
@@ -65,11 +65,13 @@ If you do not want to keep this RBAC example, remove it with:
 kubectl delete -f config/05-journal/12-rbac-readonly.yaml
 ```
 
-## 4.3 Minikube profiles
+## 4.3 Managing multiple local clusters
 
-So far, the tutorial has treated minikube as if there were only one cluster. That is the right simplification for the main walkthrough. But minikube can manage more than one local cluster by using **profiles**.
+So far, the tutorial has used a single local cluster. But you may want to run multiple clusters for different purposes—separating tutorial work from other projects, or testing different configurations.
 
-A profile is essentially a named minikube cluster instance. Different profiles let you keep separate local Kubernetes environments for different purposes.
+### 4.3.1 Minikube: Using profiles
+
+Minikube can manage more than one local cluster by using **profiles**. A profile is essentially a named minikube cluster instance.
 
 Why this can be useful:
 
@@ -116,15 +118,27 @@ If you created the example profile and no longer need it, remove it with:
 minikube delete -p tutorial-lab
 ```
 
-## 4.4 Multi-node minikube clusters
+### 4.3.2 Docker Desktop / Kind: Multiple clusters
+
+Docker Desktop's Kubernetes runs a single cluster. To run multiple clusters with Docker Desktop installed, use **kind**:
+
+```bash
+kind create cluster --name tutorial-lab
+kubectl config get-contexts
+kind delete cluster --name tutorial-lab
+```
+
+## 4.4 Multi-node local clusters
+
+The main tutorial uses a single-node local cluster because that is the clearest starting point. But both Minikube and Kind can create multi-node clusters, which is one of the easiest ways to get hands-on experience with scheduling across more than one node.
 
 The main tutorial uses a single-node minikube cluster because that is the clearest starting point. But minikube can also create a **multi-node** cluster, which is one of the easiest ways to get hands-on experience with scheduling across more than one node.
 
 This is still a local lab. The additional nodes are not separate physical machines in the way they might be in a cloud or data-center environment. But they are still useful because Kubernetes now has more than one node to choose from when placing workloads.
 
-### 4.4.1 Why try this in minikube?
+### 4.4.1 Why try a multi-node cluster?
 
-A multi-node minikube cluster is useful when you want to see:
+A multi-node local cluster is useful when you want to see:
 
 - that a cluster can have more than one schedulable node
 - that Pods can land on different nodes
@@ -133,7 +147,20 @@ A multi-node minikube cluster is useful when you want to see:
 
 This belongs in the advanced part of the tutorial because the main walkthrough does not need multiple nodes. But once the basics are comfortable, multi-node behavior is worth seeing directly.
 
-### 4.4.2 Creating a multi-node minikube cluster
+### 4.4.2 Creating a multi-node cluster
+
+**Minikube:**
+```bash
+minikube start -p multinode-lab --driver=docker --nodes 2
+kubectl config use-context multinode-lab
+kubectl get nodes -o wide
+```
+
+**Kind:**
+```bash
+kind create cluster --name multinode-lab --nodes 3
+kubectl get nodes -o wide
+```
 
 A common way to do this is to create a new profile so you do not disturb your existing tutorial cluster.
 
@@ -147,18 +174,20 @@ kubectl get nodes -o wide
 
 What these commands do:
 
-- `minikube start -p multinode-lab --driver=docker --nodes 2`
-  - creates a separate minikube profile named `multinode-lab`
-  - asks minikube to create a two-node cluster instead of a single-node one
-- `kubectl config use-context multinode-lab`
-  - points `kubectl` at that cluster
-- `kubectl get nodes -o wide`
-  - lets you confirm that more than one node is now present
+- Create a multi-node cluster with 2-3 worker nodes
+- Switch to that cluster context
+- Confirm that more than one node is now present
 
-If you want to remove this lab later:
+### Clean up
 
+**Minikube:**
 ```bash
 minikube delete -p multinode-lab
+```
+
+**Kind:**
+```bash
+kind delete cluster --name multinode-lab
 ```
 
 ### 4.4.3 What to observe once it is running
@@ -175,6 +204,8 @@ What to look for:
 - more than one node listed in `kubectl get nodes`
 - system Pods distributed across nodes rather than everything appearing on one machine
 - later, your own application Pods may land on different nodes as well
+
+The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
 
 The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
 
@@ -213,11 +244,11 @@ If you are done with the entire multi-node lab, you can remove the profile with:
 minikube delete -p multinode-lab
 ```
 
-### 4.4.5 Important limitations of this experience
+### 4.4.4 Important limitations of this experience
 
 It is still important to keep expectations realistic.
 
-A multi-node minikube cluster helps you explore:
+A multi-node local cluster helps you explore:
 
 - scheduling across nodes
 - node-level visibility in `kubectl`
@@ -227,10 +258,30 @@ But it does **not** automatically recreate all the realities of a larger environ
 
 - the nodes are still part of one local setup
 - local resource bottlenecks still come from the same host machine
-- networking and storage behavior are still shaped by the local minikube environment
+- networking and storage behavior are still shaped by the local environment
 - failure modes are still simpler than many production environments
 
 So the value of this experiment is not "now I have production." The value is "now I can see Kubernetes making placement decisions across multiple nodes."
+
+### Clean up
+
+If you only created the sample Deployment for observation, remove it with:
+
+```bash
+kubectl delete deployment hello-multi
+```
+
+If you are done with the entire multi-node lab, you can remove the cluster:
+
+**Minikube:**
+```bash
+minikube delete -p multinode-lab
+```
+
+**Kind:**
+```bash
+kind delete cluster --name multinode-lab
+```
 
 ## 4.5 Gateway and alternatives to Ingress
 
@@ -256,15 +307,15 @@ If you later want one advanced Gateway-focused extension, the best first options
 1. **NGINX Gateway Fabric**
 2. **Envoy Gateway**
 
-## 4.6 Minikube limitations and Kubernetes alternatives
+## 4.6 Local cluster limitations and Kubernetes alternatives
 
-Minikube is excellent for learning Kubernetes concepts, testing manifests, and experimenting with application behavior on a local machine. But it is still a **local development cluster**, not a full substitute for every kind of Kubernetes environment.
+Local Kubernetes clusters (Docker Desktop, Minikube, Kind) are excellent for learning Kubernetes concepts, testing manifests, and experimenting with application behavior on a local machine. But they are still **local development clusters**, not a full substitute for every kind of Kubernetes environment.
 
-That does not make minikube "fake." It is real Kubernetes. But it is real Kubernetes in a very particular operating context: usually small, local, single-user, and optimized for experimentation.
+That does not make them "fake." They are real Kubernetes. But they are real Kubernetes in a very particular operating context: usually small, local, single-user, and optimized for experimentation.
 
-### 4.6.1 Where minikube is especially strong
+### 4.6.1 Where local clusters are especially strong
 
-Minikube is a good fit when you want:
+Local clusters are a good fit when you want:
 
 - a safe place to learn Kubernetes objects and workflows
 - fast local iteration
@@ -274,25 +325,25 @@ Minikube is a good fit when you want:
 
 ### 4.6.2 Important limitations to expect
 
-Minikube usually differs from larger Kubernetes environments in several ways:
+Local clusters usually differ from larger Kubernetes environments in several ways:
 
 - **cluster size and topology**
-  - minikube is often a single-node cluster
+  - local clusters are often single-node or have limited nodes
   - that means you do not naturally experience multi-node scheduling, node failures, or cross-node networking behavior the way you would in larger environments
 - **resource constraints**
-  - minikube is sharing your local machine's CPU, memory, and disk
-  - resource pressure in minikube often reflects laptop or workstation limits as much as application behavior
+  - local clusters are sharing your local machine's CPU, memory, and disk
+  - resource pressure often reflects laptop or workstation limits as much as application behavior
 - **storage behavior**
-  - local storage in minikube is useful for learning, but it is not the same as cloud block storage, network storage, or production-grade storage classes
+  - local storage is useful for learning, but it is not the same as cloud block storage, network storage, or production-grade storage classes
 - **network exposure**
-  - NodePort, ingress, and localhost testing in minikube are often shaped by your desktop, WSL, Docker, or VM networking setup
+  - NodePort, ingress, and localhost testing are often shaped by your desktop, WSL, Docker, or VM networking setup
   - production routing and load-balancer behavior often looks different
 - **cloud integrations**
-  - minikube does not automatically give you managed load balancers, managed databases, cloud IAM integration, cloud DNS, or provider-native storage services
+  - local clusters do not automatically give you managed load balancers, managed databases, cloud IAM integration, cloud DNS, or provider-native storage services
 - **high availability and failure modes**
   - many production concerns involve control-plane redundancy, node replacement, autoscaling, disruption handling, and upgrade workflows that a local lab does not fully represent
 - **team and operational context**
-  - minikube is usually one person's environment
+  - local clusters are usually one person's environment
   - shared cluster governance, policy, audit, quotas, and organizational security models often matter much more in real deployments
 - **scaling consequences of Pod design**
   - in production-oriented environments, Pod design choices become more operationally important
@@ -301,8 +352,8 @@ Minikube usually differs from larger Kubernetes environments in several ways:
 
 So the main mindset shift is:
 
-- minikube teaches Kubernetes concepts very well
-- but it does not automatically teach every operational reality of a larger environment
+- local clusters teach Kubernetes concepts very well
+- but they do not automatically teach every operational reality of a larger environment
 
 ### 4.6.3 Common Kubernetes environment alternatives
 
@@ -317,7 +368,7 @@ Examples include:
 - **Azure AKS**
 - similar managed offerings from other providers
 
-What is different from minikube:
+What is different from local clusters:
 
 - the control plane is usually provider-managed
 - cloud integrations are much richer
@@ -325,7 +376,7 @@ What is different from minikube:
 - multi-node and production-style scaling are much more normal
 - cost, quotas, account permissions, and provider architecture become part of daily life
 
-What to expect if you later move from minikube to a managed service:
+What to expect if you later move from a local cluster to a managed service:
 
 - many basic Kubernetes manifests still look familiar
 - infrastructure objects and integrations become more provider-specific
@@ -417,21 +468,13 @@ What to expect:
 
 #### Lightweight local or edge-focused Kubernetes distributions
 
-Examples include:
+Other lightweight distributions you might encounter include:
 
-- **kind**
-- **k3s**
-- **k0s**
-- **microk8s**
+- **k3s** - focuses on lightweight Kubernetes and is common in edge, lab, and small-server environments
+- **k0s** - another lightweight Kubernetes distribution
+- **microk8s** - focuses on an easy local or small-scale Kubernetes experience with its own packaging and addon style
 
-These are not all trying to solve the exact same problem, but they are often considered alongside minikube.
-
-What is different from minikube:
-
-- **kind** is often used for CI, testing, and disposable multi-node-in-Docker scenarios
-- **k3s** focuses on lightweight Kubernetes and is common in edge, lab, and small-server environments
-- **microk8s** focuses on an easy local or small-scale Kubernetes experience with its own packaging and addon style
-- some of these environments feel more "cluster-like" in multi-node testing, while others emphasize small-footprint deployment
+These are not all trying to solve the exact same problem. Some emphasize small-footprint deployment, while others are designed for edge computing or specific use cases.
 
 What to expect:
 
@@ -442,9 +485,13 @@ What to expect:
 
 A practical comparison is:
 
-- **minikube**
-  - best for learning, local development, and experimentation
-- **kind**
+- **Docker Desktop with Kubernetes**
+  - best for Mac/Windows users who want a simple GUI-based setup
+  - strong integration with Docker workflows
+- **Minikube**
+  - best for WSL/Linux users who want flexible driver options
+  - strong for learning and local development
+- **Kind**
   - strong for disposable test clusters and CI-oriented workflows
 - **k3s / similar lightweight distributions**
   - strong for small servers, edge, labs, and lightweight deployments
@@ -453,7 +500,7 @@ A practical comparison is:
 - **self-managed clusters**
   - strong when you want maximum control and are willing to own the operational complexity
 
-### 4.6.5 What usually carries over from minikube
+### 4.6.5 What usually carries over from local clusters
 
 Even when the surrounding environment changes, many of the core lessons in this tutorial still transfer well:
 
@@ -467,7 +514,7 @@ Even when the surrounding environment changes, many of the core lessons in this 
 - Ingress and routing ideas
 - `kubectl` habits
 
-That is the most important thing to remember: minikube is not the end state for every Kubernetes user, but it is still a very good way to build the conceptual foundation.
+That is the most important thing to remember: local clusters are not the end state for every Kubernetes user, but they are still a very good way to build the conceptual foundation.
 
 When a cluster is not behaving the way you expected, it helps to think in layers instead of guessing randomly.
 
@@ -479,7 +526,7 @@ A useful troubleshooting order is:
 4. **did your workload start, schedule, and become ready?**
 5. **is networking or storage the actual problem?**
 
-The goal of this section is not to turn you into a production SRE in one step. It is to give you a practical toolkit for diagnosing common minikube and Kubernetes problems.
+The goal of this section is not to turn you into a production SRE in one step. It is to give you a practical toolkit for diagnosing common Kubernetes problems.
 
 ### 4.1.1 First checks: cluster status and context
 
@@ -488,7 +535,11 @@ Start with the broadest questions first.
 Useful commands:
 
 ```bash
+# Docker Desktop users: check Docker Desktop is running with Kubernetes enabled
+# Minikube users:
 minikube status
+
+# Both:
 kubectl config current-context
 kubectl cluster-info
 kubectl get nodes -o wide
@@ -496,7 +547,7 @@ kubectl get nodes -o wide
 
 What they help you answer:
 
-- `minikube status`
+- `minikube status` (Minikube only)
   - is the minikube cluster actually running?
 - `kubectl config current-context`
   - is `kubectl` pointing at the context you think it is?
@@ -507,15 +558,22 @@ What they help you answer:
 
 Common problems these help catch:
 
-- minikube is stopped
+- Docker Desktop: Kubernetes is disabled in settings
+- Minikube: cluster is stopped
 - `kubectl` is pointing at the wrong cluster
 - the node is not ready
 - the API server is not reachable from your shell
 
-If the context appears stale after recreating a cluster, a useful repair command is:
+If the context appears stale after recreating a cluster:
 
+**Minikube:**
 ```bash
 minikube update-context
+```
+
+**Docker Desktop / Kind:**
+```bash
+kubectl config use-context <context-name>
 ```
 
 ### 4.1.2 Inspect the node and system components
@@ -525,7 +583,11 @@ If the cluster exists but still seems unhealthy, check the node and the core sup
 Useful commands:
 
 ```bash
-kubectl describe node minikube
+# Get your node name first
+kubectl get nodes
+
+# Then describe it (replace <node-name> with docker-desktop, minikube, etc.)
+kubectl describe node <node-name>
 kubectl get pods -n kube-system -o wide
 kubectl get events -A --sort-by=.lastTimestamp
 ```
@@ -715,7 +777,7 @@ What these help you answer:
 
 - does the Ingress object exist with the rules you expected?
 - is the ingress controller running?
-- are you reaching the correct exposed port/path in minikube?
+- are you reaching the correct exposed port/path in your environment?
 - is the controller reporting routing or backend errors?
 
 A common beginner mistake is assuming an Ingress YAML problem when the real issue is that traffic is reaching the wrong port or host header.
@@ -776,15 +838,23 @@ A few habits will save you time:
 
 For local clusters especially, it is also fair to ask a very practical question:
 
-- would it be faster and clearer to reset the cluster with `minikube delete` and restart from section `1.9`?
+- would it be faster and clearer to reset the cluster and restart?
+
+**Docker Desktop:** Reset Kubernetes cluster from Docker Desktop Settings → Kubernetes → Reset Kubernetes Cluster
+
+**Minikube:** `minikube delete && minikube start --driver=docker`
+
+**Kind:** `kind delete cluster --name tutorial && kind create cluster --name tutorial`
 
 Sometimes the answer is yes, especially in a learning environment.
 
-## 4.7 Ten minikube addons worth exploring
+## 4.7 Local cluster extensions
 
-Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, minikube addons are one of the easiest ways to keep experimenting.
+Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, you may want to explore additional cluster features. The approach differs between Docker Desktop and Minikube.
 
-An addon is a prepackaged cluster feature that minikube knows how to enable and disable for you. They are useful because they let you try common Kubernetes components without manually installing every controller or supporting manifest yourself.
+### 4.7.1 Minikube: Ten addons worth exploring
+
+Minikube addons are prepackaged cluster features that minikube knows how to enable and disable for you. They are useful because they let you try common Kubernetes components without manually installing every controller or supporting manifest yourself.
 
 A good first command to know is:
 
@@ -1015,6 +1085,20 @@ A good order of experimentation after the core tutorial would be:
 That order moves from low-friction visibility and storage features toward more advanced network exposure, runtime, and image-distribution topics.
 
 One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
+
+### 4.7.2 Docker Desktop: Extending your cluster
+
+Docker Desktop's Kubernetes doesn't have an addon system like Minikube, but you can extend it in similar ways:
+
+**Kubernetes Dashboard:**
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+kubectl proxy
+```
+Then access at: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+**Additional features:**
+You can install any Kubernetes-compatible application using standard `kubectl apply` commands or Helm charts. This includes monitoring tools (Prometheus, Grafana), logging systems (ELK, Loki), and service meshes (Istio, Linkerd).
 
 ## 4.8 Exercise notes and possible solutions
 
