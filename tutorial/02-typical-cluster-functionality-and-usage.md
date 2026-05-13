@@ -35,6 +35,16 @@ Before you run the command, one small timing note matters:
 
 That pause is intentional. It gives you a short window to look at the Pod while it is alive.
 
+**Pull the image first:**
+
+In some cluster configurations, images may not pull automatically. To ensure the image is available locally before creating the Pod, pull it with your container runtime:
+
+```bash
+docker pull busybox:1.36
+```
+
+This step isn't strictly required in all environments, but it prevents the Pod from getting stuck in an `ImagePullBackOff` state while the image is being downloaded.
+
 Create the Pod:
 
 ```bash
@@ -88,6 +98,23 @@ What to look for:
 - even in the `Completed` state, Kubernetes is still keeping the Pod object and its exit details around until you delete it
 
 That timing difference is useful. It shows that a Pod can exist for a short task, not only for long-running servers, and that Kubernetes keeps status information about the finished Pod for later inspection.
+
+View detailed Pod information:
+
+```bash
+kubectl describe pod bb-demo
+```
+
+What `describe` shows that `get` does not:
+
+- **Events** - A chronological log of what happened: when the Pod was scheduled, when the container started, when it finished
+- **State transitions** - How the Pod moved from `Pending` to `Running` to `Succeeded`
+- **Node information** - Which node the Pod was assigned to (useful in multi-node clusters)
+- **Resource requests** - CPU and memory requested (if specified)
+- **Labels and annotations** - Metadata attached to the Pod for organization and configuration
+- **Restart count** - How many times the container has restarted (useful for debugging crashes)
+
+The Events section is particularly valuable for troubleshooting. It tells the story of your Pod's life: was the image pulled successfully? Did the container start? Why did it fail? When you're debugging why something isn't working, `kubectl describe` is often more helpful than `kubectl get` because it shows what actually happened, not just the current state.
 
 ### Clean up
 
@@ -176,6 +203,13 @@ POD_IP=$(kubectl get pod simple-echo-pod -o jsonpath='{.status.podIP}')
 kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP:5678"
 ```
 
+**PowerShell:**
+
+```powershell
+$POD_IP = kubectl get pod simple-echo-pod -o jsonpath='{.status.podIP}'
+kubectl run netshoot-pod-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$($POD_IP):5678"
+```
+
 Why this is written as two commands:
 
 - the first command asks Kubernetes for the Pod's current internal IP address
@@ -227,7 +261,82 @@ kubectl delete pod simple-echo-pod
 
 That keeps the first example self-contained before introducing the richer Pod used later.
 
-### 2.5 A Pod that can identify itself
+### 2.5 Creating and observing Pods in different namespaces
+
+You already learned about namespaces in **[Part 1, section 1.2.2: Namespaces and setting the default namespace](01-infrastructure-and-kubectl.md#1.2.2-namespaces-and-setting-the-default-namespace)**, and you set your default namespace to `tutorial`. This section shows how namespaces affect Pod creation and visibility.
+
+Create a Pod in the `default` namespace:
+
+```bash
+kubectl run demo-default -n default --image=busybox:1.36 --restart=Never --command -- sh -c 'echo "hello from default namespace" && sleep 30'
+```
+
+List Pods in the `tutorial` namespace (your default):
+
+```bash
+kubectl get pods
+```
+
+List Pods in the `default` namespace:
+
+```bash
+kubectl get pods -n default
+```
+
+What this demonstrates:
+
+- The Pod you created with `-n default` exists in the `default` namespace
+- Your default context is still set to `tutorial`, so `kubectl get pods` without a namespace flag only shows Pods in `tutorial`
+- The Pod in `default` is completely isolated from the `tutorial` namespace—it has a different name, different visibility, and no connection to your tutorial resources
+
+Now create a Pod with the same name in the `tutorial` namespace:
+
+```bash
+kubectl run demo-default --image=busybox:1.36 --restart=Never --command -- sh -c 'echo "hello from tutorial namespace" && sleep 30'
+```
+
+List Pods in both namespaces:
+
+```bash
+kubectl get pods
+kubectl get pods -n default
+```
+
+What this shows:
+
+- Namespaces allow the same object name to exist in different namespaces
+- Each Pod is completely separate from the other, even though they share the same name
+- The `-n` flag lets you work with objects in any namespace, not just your default
+
+Check the logs of each Pod to see the different messages:
+
+```bash
+kubectl logs demo-default
+kubectl logs demo-default -n default
+```
+
+Expected output:
+
+```text
+hello from tutorial namespace       # from the tutorial namespace Pod
+hello from default namespace        # from the default namespace Pod
+```
+
+This namespace isolation is important for several reasons:
+
+- **Team separation**: Different teams can work in their own namespaces without naming conflicts
+- **Environment separation**: Development, staging, and production can coexist in the same cluster
+- **Resource isolation**: Resource quotas and policies can be applied per namespace
+- **Visibility**: Users can be limited to seeing only specific namespaces
+
+Clean up both Pods:
+
+```bash
+kubectl delete pod demo-default
+kubectl delete pod demo-default -n default
+```
+
+### 2.6 A Pod that can identify itself
 
 Now switch to the Pod that the rest of the tutorial will use.
 
@@ -289,7 +398,7 @@ Why these are grouped together:
 - the first command creates the Pod
 - the second waits until it is actually ready before you test it
 
-### 2.6 Small challenge
+### 2.7 Small challenge
 
 In section 2.4, you already used a temporary helper Pod to access a running HTTP Pod from inside the cluster.
 
@@ -303,7 +412,7 @@ Hints:
 
 If you want to try it on your own first, stop here for a moment.
 
-A possible answer appears later in the exercise notes section in **Part 4, section 4.8**, so you can check your work there if needed.
+A possible answer appears later in the exercise notes section in **Part 4, section 4.9**, so you can check your work there if needed.
 
 That little exercise is worth doing because it reinforces that Kubernetes is not doing anything magical yet. At this point, you are still reaching one specific Pod by its IP, just as before.
 
@@ -315,7 +424,7 @@ kubectl delete pod echo-pod
 
 That cleanup is intentional because the next sections rebuild the same idea using Services and then Deployments.
 
-## 2.7 Multi-container Pods and sidecars
+## 2.8 Multi-container Pods and sidecars
 
 So far, every Pod in the tutorial has contained exactly one container. That is the most common beginner-friendly example, but Kubernetes Pods are allowed to run **more than one container**.
 
@@ -334,7 +443,7 @@ A classic example of a tightly coupled relationship is a **sidecar**. A sidecar 
 - handling local proxy duties
 - adapting data for another system
 
-### 2.7.1 Sidecar example: one container writes, one serves
+### 2.8.1 Sidecar example: one container writes, one serves
 
 File: `config/01-pods/pod-sidecar-demo.yaml`
 
@@ -433,6 +542,13 @@ POD_IP=$(kubectl get pod sidecar-demo -o jsonpath='{.status.podIP}')
 kubectl run netshoot-sidecar-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$POD_IP"
 ```
 
+**PowerShell:**
+
+```powershell
+$POD_IP = kubectl get pod sidecar-demo -o jsonpath='{.status.podIP}'
+kubectl run netshoot-sidecar-check --image=nicolaka/netshoot:latest --restart=Never --rm -i -- sh -lc "curl -fsS http://$($POD_IP)"
+```
+
 Expected response shape:
 
 ```html
@@ -460,7 +576,7 @@ kubectl delete pod sidecar-demo
 
 That is a big part of the design lesson here: a multi-container Pod is one lifecycle unit, not a tiny cluster hiding inside a Pod.
 
-### 2.7.2 Another tightly coupled pattern
+### 2.8.2 Another tightly coupled pattern
 
 A sidecar is not the only multi-container pattern. Another common one is sometimes called an **ambassador** or local proxy pattern, where one container acts as a closely coupled local proxy for the main application.
 
@@ -471,7 +587,7 @@ A useful rule of thumb is:
 - if the containers must share the same network identity, volumes, and lifecycle, a multi-container Pod can make sense
 - if the containers should scale independently, roll out independently, or fail independently, they usually belong in separate Pods
 
-## 2.8 Services
+## 2.9 Services
 
 Pods are ephemeral. A **Service** gives a stable virtual IP and DNS name that can target one or more matching Pods.
 
@@ -559,7 +675,7 @@ hello from echo-pod at <pod-ip>
 
 That response now comes through the Service rather than from manually targeting the Pod IP.
 
-## 2.9 Kubernetes networking
+## 2.10 Kubernetes networking
 
 Kubernetes networking is built around a few expectations:
 
@@ -611,130 +727,20 @@ hello from echo-pod at <pod-ip>
 
 The important idea is that cluster-internal name resolution is now doing work for you.
 
-## 2.10 Namespaces
-
-A **namespace** groups resources so you can separate environments and reduce clutter.
-
-File: `config/01-pods/namespace-tutorial.yaml`
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: tutorial
-```
-
-What is new here:
-
-- `kind: Namespace` creates a separate logical space inside the cluster
-- `metadata.name: tutorial` names that namespace `tutorial`
-- resources created in this namespace are kept separate from resources in `default` and other namespaces
-
-Create the namespace:
-
-```bash
-kubectl apply -f config/01-pods/namespace-tutorial.yaml
-```
-
-List all namespaces in the cluster:
-
-```bash
-kubectl get namespaces
-```
-
-You will usually see several namespaces that already exist before you create your own.
-
-Common namespaces to recognize:
-
-- `default`
-  - the default namespace for namespaced resources when you do not specify a different one
-- `kube-system`
-  - used for core Kubernetes system components such as DNS, control-plane helpers, and addon-related system Pods
-- `kube-public`
-  - a special namespace traditionally used for cluster information that may be readable by all users
-- `kube-node-lease`
-  - used for node lease objects that help Kubernetes track node heartbeats efficiently
-- `ingress-nginx`
-  - commonly created when the NGINX ingress addon or controller is installed; it contains the ingress controller resources rather than your application workloads
-
-The important idea is that not every namespace is meant for application code. Some exist so Kubernetes and its addons can organize their own components separately from user workloads.
-
-Move the echo resources into it:
-
-```bash
-kubectl apply -n tutorial -f config/01-pods/pod-echo.yaml
-kubectl apply -n tutorial -f config/01-pods/service-echo.yaml
-```
-
-Inspect what now exists in that namespace:
-
-```bash
-kubectl get all -n tutorial
-```
-
-Why these steps are split up:
-
-- first you create the namespace itself
-- then you create objects inside it
-- finally you inspect only that namespace so the output stays focused on tutorial resources
-
-### 2.11 Contexts and changing the default namespace
-
-Check the current context information:
-
-```bash
-kubectl config current-context
-kubectl config view --minify
-```
-
-What these commands show:
-
-- the first prints the name of the currently selected kubeconfig context
-- the second shows the currently active cluster, user, and namespace settings in a smaller view
-- `--minify` tells `kubectl config view` to show only the configuration associated with the current context instead of dumping every cluster, user, and context in the kubeconfig file
-
-Set the current context to default to the `tutorial` namespace:
-
-```bash
-kubectl config set-context --current --namespace=tutorial
-```
-
-Verify the effect:
-
-```bash
-kubectl get pods
-kubectl get svc
-```
-
-At this point, those commands should use `tutorial` by default.
-
-### 2.12 Small challenge
-
-Before moving on, try this yourself:
-
-- run `kubectl get pods` without `-n tutorial`
-- then run `kubectl get pods -n default`
-
-Question to think about:
-
-- which command shows your tutorial Pod, and why?
-
-If the result is not what you expected, look back at `kubectl config set-context --current --namespace=tutorial` and `kubectl config view --minify`.
-
-## 2.13 Labels
+## 2.11 Labels
 
 **Labels** are key/value pairs attached to objects. Kubernetes uses them heavily for selection.
 
 Show Pod labels directly:
 
 ```bash
-kubectl get pods -n tutorial --show-labels
+kubectl get pods --show-labels
 ```
 
 Filter by one specific label:
 
 ```bash
-kubectl get pods -n tutorial -l app=echo
+kubectl get pods -l app=echo
 ```
 
 Why this matters:
@@ -743,12 +749,12 @@ Why this matters:
 - the second command shows how Kubernetes can use labels to find matching objects
 - later, Services and Deployments rely on this same idea
 
-### 2.14 Small challenge
+### 2.12 Small challenge
 
 Try changing the selector yourself:
 
 ```bash
-kubectl get pods -n tutorial -l tier=demo
+kubectl get pods -l tier=demo
 ```
 
 Question to think about:
@@ -758,7 +764,7 @@ Question to think about:
 
 You can answer that by comparing the labels on the current Pod with the labels you will see later in the Deployment template.
 
-## 2.15 Deployments
+## 2.13 Deployments
 
 A **Deployment** manages rollout for a stateless application.
 
@@ -797,11 +803,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          command:
-            - /bin/sh
-            - -c
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           args:
-            - exec /http-echo -text="hello from ${POD_NAME}" -listen=:5678
+            - "-text=hello from $(POD_NAME) at $(POD_IP)"
           ports:
             - containerPort: 5678
 ```
@@ -818,15 +825,16 @@ What is new here:
 - `template.metadata.labels` applies labels to every Pod created by this Deployment
 - `tier: demo` and `lesson: deployments` are extra descriptive labels for filtering and organization
 - `containers` defines the container each replica will run
+- `env` defines environment variables named `POD_NAME` and `POD_IP`
 - `env.valueFrom.fieldRef.fieldPath: metadata.name` fills `POD_NAME` with each Pod's own name
-- `command` starts a shell explicitly inside the container
-- `args` tell the echo server to reply with the Pod name and listen on port 5678
+- `env.valueFrom.fieldRef.fieldPath: status.podIP` fills `POD_IP` with each Pod's internal cluster IP address
+- `args` uses Kubernetes variable expansion so `$(POD_NAME)` and `$(POD_IP)` are resolved by the container runtime without requiring a shell inside the image
 - `ports.containerPort: 5678` declares the application port inside each container
 
 Remove the earlier standalone Pod:
 
 ```bash
-kubectl delete pod -n tutorial echo-pod --ignore-not-found
+kubectl delete pod echo-pod --ignore-not-found
 ```
 
 Why do this first?
@@ -836,8 +844,8 @@ Because the goal now is to let the Deployment manage the backend Pods instead of
 Apply the Deployment and wait for rollout:
 
 ```bash
-kubectl apply -n tutorial -f config/01-pods/deployment-echo.yaml
-kubectl rollout status deployment/echo-deployment -n tutorial
+kubectl apply -f config/01-pods/deployment-echo.yaml
+kubectl rollout status deployment/echo-deployment
 ```
 
 What these commands do:
@@ -848,8 +856,8 @@ What these commands do:
 Scale the Deployment to three replicas:
 
 ```bash
-kubectl scale deployment/echo-deployment -n tutorial --replicas=3
-kubectl rollout status deployment/echo-deployment -n tutorial
+kubectl scale deployment/echo-deployment --replicas=3
+kubectl rollout status deployment/echo-deployment
 ```
 
 Why these are separate again:
@@ -860,7 +868,7 @@ Why these are separate again:
 Inspect the resulting Pods:
 
 ```bash
-kubectl get pods -n tutorial -o wide
+kubectl get pods -o wide
 ```
 
 Because the Service still selects `app: echo`, it can target the new Pods without changing the Service definition.
@@ -877,17 +885,17 @@ hello from echo-deployment-7d8c6c9f5b-ghi56
 
 The exact names will be different in your cluster, but the important point is that each response can come from a different replica.
 
-### 2.16 Small challenge
+### 2.14 Small challenge
 
 Before you continue, try answering this by observation:
 
-- after scaling to 3 replicas, how many Pods do you expect `kubectl get pods -n tutorial` to show for this Deployment?
+- after scaling to 3 replicas, how many Pods do you expect `kubectl get pods` to show for this Deployment?
 - which label would you use if you wanted to list only the Pods managed by this application?
 
 One way to check yourself is:
 
 ```bash
-kubectl get pods -n tutorial -l app=echo
+kubectl get pods -l app=echo
 ```
 
 If you want an extra stretch goal, run the Service through `port-forward` again and send a few requests. If the responses show different Pod names over time, that is strong evidence that the Service is distributing traffic across the available replicas rather than always choosing one fixed backend.
@@ -895,7 +903,7 @@ If you want an extra stretch goal, run the Service through `port-forward` again 
 A concrete way to try that is:
 
 ```bash
-kubectl port-forward -n tutorial service/echo-service 8080:80
+kubectl port-forward service/echo-service 8080:80
 ```
 
 Then, in another terminal:
@@ -911,7 +919,121 @@ Question to think about:
 
 If you want a possible answer later, see the exercise solutions section at the end of the tutorial.
 
-## 2.17 Secrets
+## 2.15 ConfigMaps
+
+A **ConfigMap** stores non-secret configuration data.
+
+**Why this matters:**
+
+- ConfigMaps let you separate configuration from application code
+- You can change configuration without rebuilding container images
+- Multiple environments can use different ConfigMaps with the same application
+- Configuration can be version-controlled and reviewed alongside your manifests
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+data:
+  app-mode: tutorial
+  index.html: |
+    <h1>Hello from a ConfigMap</h1>
+```
+
+What is new here:
+
+- `kind: ConfigMap` creates a Kubernetes object for non-secret configuration
+- `metadata.name: example-config` gives the ConfigMap its name
+- `data` stores ordinary key/value configuration entries
+- `app-mode: tutorial` stores a simple configuration value
+- `index.html: |` stores a small multiline text file inside the ConfigMap
+
+Apply the ConfigMap:
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+data:
+  app-mode: tutorial
+  greeting-message: "Hello from ConfigMap"
+EOF
+```
+
+Inspect what exists:
+
+```bash
+kubectl get configmap example-config
+kubectl describe configmap example-config
+```
+
+### Using a ConfigMap in a Pod
+
+ConfigMaps become useful when you actually consume them in a Pod. There are three common ways:
+
+1. **Environment variables** - single key/value pairs as env vars
+2. **EnvFrom** - all keys as environment variables
+3. **Volume mounting** - mount ConfigMap data as files
+
+Here's a Pod that demonstrates environment variable usage:
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-demo
+spec:
+  containers:
+    - name: demo
+      image: busybox:1.36
+      command: ["sh", "-c", "echo APP_MODE is $APP_MODE && echo GREETING is $GREETING && sleep 300"]
+      env:
+        - name: APP_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: example-config
+              key: app-mode
+        - name: GREETING
+          valueFrom:
+            configMapKeyRef:
+              name: example-config
+              key: greeting-message
+EOF
+```
+
+Check the Pod's output to see the ConfigMap values:
+
+```bash
+kubectl logs configmap-demo
+```
+
+Expected output:
+
+```text
+APP_MODE is tutorial
+GREETING is Hello from ConfigMap
+```
+
+What this demonstrates:
+
+- The Pod didn't have the configuration hardcoded
+- The ConfigMap values were injected as environment variables at runtime
+- You can change the ConfigMap and the Pod would see new values on restart (though running Pods don't auto-update env vars)
+
+Clean up:
+
+```bash
+kubectl delete pod configmap-demo
+kubectl delete configmap example-config
+```
+
+## 2.16 Secrets
 
 A **Secret** stores sensitive values such as passwords, tokens, and connection strings.
 
@@ -959,8 +1081,8 @@ EOF
 Inspect what exists:
 
 ```bash
-kubectl get secret example-secret -n tutorial
-kubectl describe secret example-secret -n tutorial
+kubectl get secret example-secret
+kubectl describe secret example-secret
 ```
 
 What to notice:
@@ -969,46 +1091,84 @@ What to notice:
 - Kubernetes knows the key names stored in it
 - but you should think of the values as sensitive data that should not be handled as casually as normal config
 
-This simple example is enough to make the journal database manifests later feel less surprising.
+### Using a Secret in a Pod
 
-### Clean up
+Secrets become useful when you consume them in a Pod. Like ConfigMaps, you can use Secrets as environment variables or mounted volumes.
 
-If you do not want to keep this example Secret in the cluster, remove it:
+Volume mounting is generally more secure for sensitive data because:
+
+- Secret values don't appear in environment variable listings
+- They're not visible in process inspection tools like `ps`
+- Applications can read them only when explicitly needed
+
+Here's a Pod that demonstrates Secret usage via volume mounting:
 
 ```bash
-kubectl delete secret example-secret -n tutorial
-```
-
-## 2.18 ConfigMaps
-
-A **ConfigMap** stores non-secret configuration data.
-
-Example:
-
-```yaml
+kubectl apply -f - <<'EOF'
 apiVersion: v1
-kind: ConfigMap
+kind: Pod
 metadata:
-  name: example-config
-  namespace: tutorial
-data:
-  app-mode: tutorial
-  index.html: |
-    <h1>Hello from a ConfigMap</h1>
+  name: secret-demo
+spec:
+  containers:
+    - name: demo
+      image: busybox:1.36
+      command: ["sh", "-c", "echo Reading credentials from file... && cat /etc/secrets/username && echo Connecting as $(cat /etc/secrets/username) to database... && sleep 300"]
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/secrets
+          readOnly: true
+  volumes:
+    - name: secret-volume
+      secret:
+        secretName: example-secret
+EOF
 ```
 
-What is new here:
+Check the Pod's output to see the Secret values:
 
-- `kind: ConfigMap` creates a Kubernetes object for non-secret configuration
-- `metadata.name: example-config` gives the ConfigMap its name
-- `metadata.namespace: tutorial` places it in the `tutorial` namespace
-- `data` stores ordinary key/value configuration entries
-- `app-mode: tutorial` stores a simple configuration value
-- `index.html: |` stores a small multiline text file inside the ConfigMap
+```bash
+kubectl logs secret-demo
+```
 
-ConfigMaps are useful for small files, app settings, and simple tutorial content.
+Expected output:
 
-## 2.19 Persistent Volumes and PersistentVolumeClaims
+```text
+Reading credentials from file...
+demo
+Connecting as demo to database...
+```
+
+Verify the mounted files:
+
+```bash
+kubectl exec secret-demo -- ls -la /etc/secrets
+kubectl exec secret-demo -- cat /etc/secrets/username
+```
+
+What this demonstrates:
+
+- Each key in the Secret becomes a file in the mounted directory
+- The file contents are the Secret values (automatically decoded from base64)
+- The volume is mounted read-only, preventing accidental modification
+- Files contain only the raw secret values, not base64 encoding
+
+Important security note:
+
+- Secret data is base64-encoded in the API server, but this is **not encryption**—anyone with API access can decode it
+- Volume mounting keeps secrets out of environment listings, but they're still visible to anyone who can exec into the container
+- For production use, consider encryption at rest and more sophisticated secret management systems
+
+Clean up:
+
+```bash
+kubectl delete pod secret-demo
+kubectl delete secret example-secret
+```
+
+This simple example is enough to make the journal database manifests later feel less surprising.
+
+## 2.17 Persistent Volumes and PersistentVolumeClaims
 
 A **PersistentVolume (PV)** represents storage made available to the cluster. A **PersistentVolumeClaim (PVC)** is a request to use some of that storage.
 
@@ -1061,6 +1221,24 @@ What this PV example means:
 
 That `hostPath` pattern is useful for a simple lab, but it is not usually the right storage approach for production systems.
 
+### Node-local storage vs. network storage
+
+**Node-local storage** (`hostPath` or `local` PV type):
+
+- The storage exists only on a specific node
+- Pods using that storage must be scheduled on that same node (Kubernetes enforces this with `nodeAffinity`)
+- If the node goes down, the storage and any pods using it are unavailable on other nodes
+- Useful for single-node clusters, temporary data, or cached data that can be recreated
+
+**Network storage** (NFS, cloud block storage, CSI drivers):
+
+- Storage is accessible from multiple nodes
+- Pods can move between nodes while maintaining access to the same data
+- More complex to set up but required for stateful workloads in multi-node clusters
+- Examples: NFS, AWS EBS, Azure Disk, Google Persistent Disk, Ceph, GlusterFS
+
+Your local cluster (Docker Desktop or Minikube) has only one node, so node-local storage works fine for learning. In a production multi-node cluster, database workloads typically use network-backed storage classes so pods can be rescheduled while maintaining data access.
+
 Other ways PVs can be backed include:
 
 - local node disks
@@ -1077,7 +1255,7 @@ How a PVC uses a PV:
 
 This is worth introducing as a core concept before the database examples, because it demonstrates a central Kubernetes idea: a Pod can go away while the storage survives.
 
-### 2.20 Simple persistence demo
+### 2.18 Simple persistence demo
 
 File: `config/01-pods/pvc-demo.yaml`
 
@@ -1152,17 +1330,17 @@ Apply it:
 
 ```bash
 kubectl apply -f config/01-pods/pvc-demo.yaml
-kubectl rollout status deployment/pvc-demo -n tutorial
-kubectl get pvc -n tutorial
-kubectl exec -n tutorial deploy/pvc-demo -- cat /data/hello.txt
+kubectl rollout status deployment/pvc-demo
+kubectl get pvc
+kubectl exec deploy/pvc-demo -- cat /data/hello.txt
 ```
 
 Delete the Pod and let the Deployment bring up another one:
 
 ```bash
-kubectl delete pod -n tutorial -l app=pvc-demo
-kubectl rollout status deployment/pvc-demo -n tutorial
-kubectl exec -n tutorial deploy/pvc-demo -- cat /data/hello.txt
+kubectl delete pod -l app=pvc-demo
+kubectl rollout status deployment/pvc-demo
+kubectl exec deploy/pvc-demo -- cat /data/hello.txt
 ```
 
 What this demonstrates:
@@ -1182,8 +1360,6 @@ kubectl delete -f config/01-pods/pvc-demo.yaml
 ```
 
 If your storage class uses `Delete` reclaim behavior, the backing storage is usually removed automatically when the claim is deleted. In other environments, cleanup behavior can differ.
-
-### 2.21 Why this matters later
 
 A PVC is a request, not the storage implementation itself. In minikube, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
 

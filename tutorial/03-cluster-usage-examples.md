@@ -312,7 +312,7 @@ Because the cluster cannot run the journal API Deployment until the image exists
 
 Apply the Secret, PVC, database Deployment, and database Service first.
 
-The Secret concept itself was introduced earlier in **section 2.17**, so at this point the new thing is not "what is a Secret?" but rather how a Secret becomes part of an application deployment.
+The Secret concept itself was introduced earlier in **section 2.16**, so at this point the new thing is not "what is a Secret?" but rather how a Secret becomes part of an application deployment.
 
 Apply the Secret, PVC, database Deployment, and database Service first:
 
@@ -527,19 +527,37 @@ kubectl get ingress -n tutorial
 Get the ingress controller's NodePort.
 
 **Docker Desktop:**
+
 ```bash
 NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
 echo "$NODEPORT"
 ```
 
+**PowerShell:**
+
+```powershell
+$NODEPORT = kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}'
+echo $NODEPORT
+```
+
 For Docker Desktop, you can access the ingress via `localhost`.
 
 **Minikube:**
+
 ```bash
 MINIKUBE_IP=$(minikube ip)
 NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
 echo "$MINIKUBE_IP"
 echo "$NODEPORT"
+```
+
+**PowerShell:**
+
+```powershell
+$MINIKUBE_IP = minikube ip
+$NODEPORT = kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}'
+echo $MINIKUBE_IP
+echo $NODEPORT
 ```
 
 For Minikube, you need both the IP and the NodePort.
@@ -568,8 +586,24 @@ curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/api"
 curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/journal/"
 ```
 
+**PowerShell:** Use the `$NODEPORT` variable you set earlier. The variable expansion works the same way in PowerShell:
+
+```powershell
+curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/"
+curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/api"
+curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/journal/"
+```
+
 **Minikube:**
 ```bash
+curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
+curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"
+curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
+```
+
+**PowerShell:** Use the `$MINIKUBE_IP` and `$NODEPORT` variables you set earlier:
+
+```powershell
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"
 curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
@@ -586,5 +620,24 @@ kubectl delete -f config/05-journal/13-ingress.yaml
 ```
 
 If you also want to remove the backend applications, delete the corresponding manifests from the earlier sections as well.
+
+### Challenge: Expose the Dashboard via Ingress
+
+You now have a working Ingress controller that routes traffic to `/genkey/*` and `/journal/*` paths. Can you create an Ingress rule to expose the Kubernetes Dashboard through the same ingress controller?
+
+**Requirements:**
+
+- Create an Ingress object that routes to the Dashboard Service
+- Use a distinct host or path (for example, `dashboard.local` or `/dashboard/`)
+- The Dashboard Service is named `kubernetes-dashboard` in the `kubernetes-dashboard` namespace
+- Hint: You've seen examples of both host-based and path-based routing
+
+**What to try:**
+
+1. Create an Ingress YAML for the Dashboard
+2. Apply it with `kubectl apply -f dashboard-ingress.yaml`
+3. Access the Dashboard through your Ingress URL instead of `kubectl proxy`
+
+**A solution is provided in [Part 4, section 4.10.6: Dashboard Ingress challenge](04-advanced-cluster-usage.md#4.10.6-dashboard-ingress-challenge).**
 
 ---

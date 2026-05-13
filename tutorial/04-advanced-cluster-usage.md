@@ -848,11 +848,304 @@ For local clusters especially, it is also fair to ask a very practical question:
 
 Sometimes the answer is yes, especially in a learning environment.
 
-## 4.7 Local cluster extensions
+## 4.7 Shared storage with an NFS server pod
+
+Earlier in the tutorial, you learned that node-local storage (like `hostPath` PVs) is tied to a specific node. This section demonstrates a practical pattern for working around that limitation: run an NFS server as a pod that serves node-local storage to other pods via the network.
+
+**Why this pattern is useful:**
+
+- Multiple pods can share the same storage without requiring cloud infrastructure
+- Pods can be rescheduled while maintaining access to the same data
+- Useful for multi-node local clusters or development environments
+- Demonstrates how network filesystem mounting works in Kubernetes
+
+**Architecture:**
+
+```text
+Node-local PV (hostPath: /nfs-data)
+        |
+        v
+NFS server Pod (exports /nfs-data via NFS)
+        |
+        v
+Service/nfs-server (stable endpoint: port 2049)
+        |
+        +----> Client Pod 1 (mounts NFS share at /data)
+        +----> Client Pod 2 (mounts NFS share at /data)
+```
+
+### 4.7.1 Create the node-local PersistentVolume
+
+First, create a PV backed by a directory on the node:
+
+File: `config/03-nfs-demo/pv-nfs-data.yaml`
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-data-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /nfs-data
+```
+
+What this defines:
+
+- `kind: PersistentVolume` creates a cluster storage resource
+- `capacity.storage: 1Gi` specifies the size
+- `accessModes: ReadWriteOnce` allows single-node mounting (the NFS server pod will mount it)
+- `persistentVolumeReclaimPolicy: Retain` keeps the data even if the PVC is deleted
+- `hostPath.path: /nfs-data` uses a directory on the node itself
+
+Apply the PV:
+
+```bash
+kubectl apply -f config/03-nfs-demo/pv-nfs-data.yaml
+```
+
+### 4.7.2 Create the PersistentVolumeClaim
+
+Now create a PVC that binds to the PV:
+
+File: `config/03-nfs-demo/pvc-nfs-data.yaml`
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+Apply the PVC:
+
+```bash
+kubectl apply -f config/03-nfs-demo/pvc-nfs-data.yaml
+kubectl get pvc nfs-data-pvc
+```
+
+Expected output shows `STATUS: Bound`:
+
+```text
+NAME          STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+nfs-data-pvc  Bound    nfs-data-pv    1Gi        RWO                           <seconds>
+```
+
+### 4.7.3 Deploy the NFS server pod
+
+Now deploy an NFS server that uses the PVC and exports it as an NFS share:
+
+File: `config/03-nfs-demo/nfs-server.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      containers:
+        - name: nfs-server
+          image: gcr.io/google_containers/volume-nfs:latest
+          ports:
+            - name: nfs
+              containerPort: 2049
+            - name: mountd
+              containerPort: 20048
+            - name: rpcbind
+              containerPort: 111
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: nfs-data
+              mountPath: /data
+      volumes:
+        - name: nfs-data
+          persistentVolumeClaim:
+            claimName: nfs-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+spec:
+  selector:
+    app: nfs-server
+  ports:
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
+  type: ClusterIP
+```
+
+What this defines:
+
+- A Deployment running the `volume-nfs` container image
+- The container runs as privileged (required for NFS server operation)
+- The PVC is mounted at `/data` inside the container
+- A Service exposes the NFS server on standard NFS ports (2049, 20048, 111)
+
+Apply the NFS server:
+
+```bash
+kubectl apply -f config/03-nfs-demo/nfs-server.yaml
+kubectl wait --for=condition=ready pod -l app=nfs-server --timeout=120s
+```
+
+### 4.7.4 Deploy client pods that use the NFS share
+
+Now create pods that mount and use the NFS share:
+
+File: `config/03-nfs-demo/nfs-client-writer.yaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-client-writer
+spec:
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "NFS Client Writer - $(date)" > /data/writer.txt
+          echo "This file was written by nfs-client-writer" >> /data/writer.txt
+          echo "Content:" && cat /data/writer.txt
+          echo "Sleeping for 5 minutes..."
+          sleep 300
+      volumeMounts:
+        - name: nfs-share
+          mountPath: /data
+  volumes:
+    - name: nfs-share
+      nfs:
+        server: nfs-server
+        path: /
+```
+
+What this demonstrates:
+
+- The pod mounts the NFS share using the `nfs` volume type
+- `server: nfs-server` uses the Service DNS name
+- `path: /` corresponds to the `/data` directory exported by the NFS server
+- The pod writes a file that other pods can read
+
+Apply the writer pod:
+
+```bash
+kubectl apply -f config/03-nfs-demo/nfs-client-writer.yaml
+kubectl logs nfs-client-writer
+```
+
+Expected output:
+
+```text
+NFS Client Writer - <date>
+This file was written by nfs-client-writer
+Content:
+NFS Client Writer - <date>
+This file was written by nfs-client-writer
+Sleeping for 5 minutes...
+```
+
+Now create a second pod that reads the file:
+
+```bash
+kubectl run nfs-client-reader --image=busybox:1.36 --restart=Never --rm -i -- sh -c "
+  echo 'Installing NFS client...' &&
+  apk add --no-cache nfs-client &&
+  echo 'Mounting NFS share...' &&
+  mkdir /mnt/nfs &&
+  mount -t nfs nfs-server:/ /mnt/nfs &&
+  echo 'Reading file from NFS share:' &&
+  cat /mnt/nfs/writer.txt &&
+  echo 'Done!'
+"
+```
+
+Expected output shows the same content written by the first pod:
+
+```text
+Reading file from NFS share:
+NFS Client Writer - <date>
+This file was written by nfs-client-writer
+Done!
+```
+
+### 4.7.5 What this demonstrates
+
+- **Shared storage**: Multiple pods accessed the same file
+- **Network filesystem**: The NFS protocol allowed remote file access
+- **Service integration**: The NFS server was accessed through a stable Service DNS name
+- **Separation of concerns**: The NFS server pod manages storage independently from client pods
+
+### 4.7.6 Important limitations
+
+- **Single node**: The underlying PV is still node-local via `hostPath`
+- **Node affinity**: The NFS server pod must run on the node where the `/nfs-data` directory exists
+- **Production considerations**: For production use, consider:
+  - Network-attached storage (NAS) or cloud storage instead of `hostPath`
+  - Proper NFS server configuration with authentication and security
+  - Readiness probes and health checks for the NFS server
+
+### 4.7.7 Clean up
+
+Remove all the resources created in this demonstration:
+
+```bash
+kubectl delete pod nfs-client-writer
+kubectl delete deployment nfs-server
+kubectl delete service nfs-server
+kubectl delete pvc nfs-data-pvc
+kubectl delete pv nfs-data-pv
+```
+
+If you want to remove the node-local directory as well:
+
+**Docker Desktop:**
+```bash
+docker exec -it desktop-worker sh -c "rm -rf /nfs-data"
+```
+
+**Minikube:**
+```bash
+minikube ssh "sudo rm -rf /nfs-data"
+```
+
+**Kind:**
+```bash
+docker exec -it tutorial-control-plane sh -c "rm -rf /nfs-data"
+```
+
+## 4.8 Local cluster extensions
 
 Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, you may want to explore additional cluster features. The approach differs between Docker Desktop and Minikube.
 
-### 4.7.1 Minikube: Ten addons worth exploring
+### 4.8.1 Minikube: Ten addons worth exploring
 
 Minikube addons are prepackaged cluster features that minikube knows how to enable and disable for you. They are useful because they let you try common Kubernetes components without manually installing every controller or supporting manifest yourself.
 
@@ -876,11 +1169,11 @@ Two important addons have already been used in this tutorial:
   - used more fully in the application routing walkthrough in **section 3.11**
 - `metrics-server`
   - enabled in **section 1.1.10**
-  - explained and used with `kubectl top` in **section 1.2.4**
+  - explained and used with `kubectl top` in **section 1.2.5**
 
 Those were introduced earlier because they were needed for the main walkthrough. The list below focuses on **additional addons** you can experiment with after the core tutorial, while still keeping a practical top-10 set overall.
 
-### 4.7.1 dashboard
+### 4.8.2 dashboard
 
 What it does:
 
@@ -898,7 +1191,7 @@ minikube addons enable dashboard
 minikube dashboard
 ```
 
-### 4.7.2 storage-provisioner
+### 4.8.3 storage-provisioner
 
 What it does:
 
@@ -917,7 +1210,7 @@ kubectl get storageclass
 kubectl get pvc -A
 ```
 
-### 4.7.3 default-storageclass
+### 4.8.4 default-storageclass
 
 What it does:
 
@@ -935,7 +1228,7 @@ minikube addons enable default-storageclass
 kubectl get storageclass
 ```
 
-### 4.7.4 registry
+### 4.8.5 registry
 
 What it does:
 
@@ -955,7 +1248,7 @@ kubectl get svc -n kube-system
 
 This one often benefits from reading the current minikube docs before deeper use, because local image workflow details can vary by driver and setup.
 
-### 4.7.5 registry-creds
+### 4.8.6 registry-creds
 
 What it does:
 
@@ -975,7 +1268,7 @@ kubectl get pods -n kube-system
 
 This addon is more interesting once you have a real registry workflow to test.
 
-### 4.7.6 volumesnapshots
+### 4.8.7 volumesnapshots
 
 What it does:
 
@@ -993,7 +1286,7 @@ minikube addons enable volumesnapshots
 kubectl api-resources | grep -i snapshot
 ```
 
-### 4.7.7 csi-hostpath-driver
+### 4.8.8 csi-hostpath-driver
 
 What it does:
 
@@ -1012,7 +1305,7 @@ kubectl get csidrivers
 kubectl get pods -A | grep csi || true
 ```
 
-### 4.7.8 gvisor
+### 4.8.9 gvisor
 
 What it does:
 
@@ -1032,7 +1325,7 @@ kubectl get runtimeclass
 
 This is more advanced than the others because it leads into runtime-class and sandboxing topics.
 
-### 4.7.9 logviewer
+### 4.8.10 logviewer
 
 What it does:
 
@@ -1050,27 +1343,54 @@ minikube addons enable logviewer
 minikube service logviewer -n kube-system
 ```
 
-### 4.7.10 metallb
+### 4.8.11 metallb
 
 What it does:
 
 - provides a software load-balancer implementation for bare-metal or local-cluster style environments
+- assigns external IPs to Services of type `LoadBalancer` so they don't remain in `<pending>` state
 
 Why it is useful:
 
 - helps you experiment with `LoadBalancer` Services in an environment that does not have a cloud-provider load balancer by default
 - useful when you want to better understand how service exposure differs between local clusters and cloud clusters
+- covered in the AKS example at **section 4.6.3**, where cloud LoadBalancers are discussed
 
-Basic use:
+**Minikube:**
 
 ```bash
 minikube addons enable metallb
 kubectl get pods -n metallb-system
 ```
 
+**Docker Desktop / Kind:**
+
+Both use the same MetalLB installation:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
+```
+
+Create an IPAddressPool for your local network range:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: example
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.1.240-192.168.1.250
+EOF
+```
+
+Note: Docker Desktop can expose LoadBalancer Services directly on localhost without MetalLB, and Kind includes limited LoadBalancer support using port-mapping. Install MetalLB only if you want full LoadBalancer functionality with custom IP pools.
+
 This addon becomes more interesting when you start experimenting with `Service` objects of type `LoadBalancer`.
 
-### 4.7.11 How to choose what to try next
+### 4.8.12 How to choose what to try next
 
 A good order of experimentation after the core tutorial would be:
 
@@ -1086,7 +1406,7 @@ That order moves from low-friction visibility and storage features toward more a
 
 One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
 
-### 4.7.2 Docker Desktop: Extending your cluster
+### 4.8.13 Docker Desktop: Extending your cluster
 
 Docker Desktop's Kubernetes doesn't have an addon system like Minikube, but you can extend it in similar ways:
 
@@ -1100,13 +1420,203 @@ Then access at: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/ser
 **Additional features:**
 You can install any Kubernetes-compatible application using standard `kubectl apply` commands or Helm charts. This includes monitoring tools (Prometheus, Grafana), logging systems (ELK, Loki), and service meshes (Istio, Linkerd).
 
-## 4.8 Exercise notes and possible solutions
+## 4.9 kubectl config and managing multiple clusters
+
+Throughout this tutorial, you've used `kubectl` to interact with a single local cluster. As you work with Kubernetes more, you'll likely need to manage multiple clusters: your local development cluster, test clusters, and production environments. The `kubectl config` command is how you manage these connections.
+
+**Understanding kubeconfig:**
+
+Kubernetes stores cluster connection information in a kubeconfig file, typically at `~/.kube/config`. This file contains:
+- **Clusters**: API server endpoints and certificate authorities
+- **Users**: authentication credentials (certificates, tokens)
+- **Contexts**: combinations of a cluster, user, and namespace
+
+A context is a named shortcut. Instead of specifying `--cluster=production --user=admin --namespace=app`, you just use `kubectl config use-context production`.
+
+**Viewing configuration:**
+
+See your current context:
+
+```bash
+kubectl config current-context
+```
+
+View all configured contexts:
+
+```bash
+kubectl config get-contexts
+```
+
+View the complete kubeconfig file:
+
+```bash
+kubectl config view
+```
+
+View just the cluster information:
+
+```bash
+kubectl config view --minify
+```
+
+The `--minify` flag shows only the current context's information, which is useful when debugging connection problems.
+
+**Switching contexts:**
+
+Switch to a different context:
+
+```bash
+kubectl config use-context <context-name>
+```
+
+After switching, all `kubectl` commands will target that cluster until you switch again. This is why you ran `kubectl config current-context` earlier in the tutorial—to verify which cluster you're targeting.
+
+Set a default namespace for the current context:
+
+```bash
+kubectl config set-context --current --namespace=testing
+```
+
+Now `kubectl get pods` will show pods in the `testing` namespace by default, without needing `-n testing` on every command.
+
+**Adding and removing clusters:**
+
+Rename a context:
+
+```bash
+kubectl config rename-context old-name new-name
+```
+
+Delete a context:
+
+```bash
+kubectl config delete-context <context-name>
+```
+
+Delete a cluster:
+
+```bash
+kubectl config delete-cluster <cluster-name>
+```
+
+Set credentials:
+
+```bash
+kubectl config set-credentials <user-name> --client-certificate=<path> --client-key=<path>
+```
+
+Set a cluster endpoint:
+
+```bash
+kubectl config set-cluster <cluster-name> --server=https://kubernetes.example.com
+```
+
+**Common workflows:**
+
+**Quick context switching:**
+
+Create an alias or shell function to switch contexts quickly:
+
+```bash
+# Add to your .bashrc or .zshrc
+kctx() {
+  kubectl config use-context $1
+}
+
+# Usage: kctx minikube
+```
+
+**View namespace for current context:**
+
+```bash
+kubectl config view --minify -o jsonpath='{.contexts[0].context.namespace}'
+```
+
+**List all clusters with their current context status:**
+
+```bash
+kubectl config get-contexts -o name
+kubectl config current-context
+```
+
+**Multiple kubeconfig files:**
+
+Instead of one large kubeconfig file, you can keep separate files and merge them when needed:
+
+```bash
+export KUBECONFIG=~/.kube/config:~/.kube/work-config:~/.kube/personal-config
+kubectl config get-contexts
+```
+
+You can also merge files permanently:
+
+```bash
+kubectl config view --flatten > merged-config
+mv merged-config ~/.kube/config
+```
+
+**Troubleshooting connection issues:**
+
+When `kubectl` can't reach your cluster, start here:
+
+```bash
+# 1. What context am I using?
+kubectl config current-context
+
+# 2. What cluster does this context point to?
+kubectl config view --minify
+
+# 3. Can I reach the API server?
+kubectl cluster-info
+
+# 4. Is the certificate valid?
+kubectl get nodes
+```
+
+Common issues:
+- Wrong context: You're targeting a different cluster than you think
+- Stale credentials: Certificates expired or tokens rotated
+- VPN required: Production clusters often require VPN access
+- Firewall: API server port blocked
+
+**Best practices:**
+
+- Use descriptive context names: `dev-cluster`, `staging-us-east`, `production-main`
+- Keep separate kubeconfig files for work and personal clusters
+- Use shell prompts or tools to show your current context (tools like `kube-ps1` or `kubectx` can help)
+- Never commit kubeconfig files with credentials to version control
+
+**Minikube and Kind considerations:**
+
+Minikube and Kind automatically add contexts when you create clusters:
+
+```bash
+# Minikube creates a context named "minikube"
+minikube start
+kubectl config get-contexts  # Shows "minikube" context
+
+# Kind creates contexts prefixed with "kind-"
+kind create cluster --name tutorial
+kubectl config get-contexts  # Shows "kind-tutorial" context
+```
+
+When you delete these clusters, remember to remove their contexts:
+
+```bash
+minikube delete
+kubectl config delete-context minikube
+
+kind delete cluster --name tutorial
+kubectl config delete-context kind-tutorial
+```
+
+## 4.10 Exercise notes and possible solutions
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.8.1 Pod access challenge from section 2.5
+### 4.10.1 Pod access challenge from section 2.5
 
 Question:
 
@@ -1127,7 +1637,7 @@ hello from echo-pod at <pod-ip>
 
 If that worked, you confirmed that `echo-pod` is reachable from inside the cluster the same way the simpler Pod was.
 
-### 4.8.2 Namespace default challenge from section 2.11
+### 4.10.2 Namespace default challenge from section 2.11
 
 Question:
 
@@ -1139,7 +1649,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.8.3 Label selector challenge from section 2.13
+### 4.10.3 Label selector challenge from section 2.11
 
 Question:
 
@@ -1151,7 +1661,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.8.4 Deployment observation challenge from section 2.15
+### 4.10.4 Deployment observation challenge from section 2.13
 
 Questions:
 
@@ -1189,7 +1699,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.8.5 Ingress route prediction challenge from section 3.11
+### 4.10.5 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -1205,7 +1715,96 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-## 4.9 What is already ready for polish later
+### 4.10.6 Dashboard Ingress challenge from section 3.11
+
+Question:
+
+Create an Ingress rule to expose the Kubernetes Dashboard through the ingress controller.
+
+One solution:
+
+There are multiple valid approaches. Here's one using a separate hostname:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: kubernetes-dashboard
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: dashboard.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kubernetes-dashboard
+            port:
+              number: 443
+```
+
+Apply the manifest:
+
+```bash
+kubectl apply -f dashboard-ingress.yaml
+```
+
+Get the ingress controller's NodePort and access the Dashboard:
+
+**Docker Desktop:**
+```bash
+NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
+curl -H 'Host: dashboard.local' "http://localhost:$NODEPORT/"
+```
+
+**Minikube:**
+```bash
+MINIKUBE_IP=$(minikube ip)
+NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
+curl -H 'Host: dashboard.local' "http://$MINIKUBE_IP:$NODEPORT/"
+```
+
+Important notes about this solution:
+
+- The Ingress object must be created in the `kubernetes-dashboard` namespace because that's where the Dashboard Service exists
+- The host header `dashboard.local` must be used when accessing the URL, or the request won't match this Ingress rule
+- The Dashboard Service listens on port 443 (HTTPS), which is why the backend service port is 443
+- The `nginx.ingress.kubernetes.io/rewrite-target: /` annotation ensures requests are properly forwarded to the root path
+
+Alternative approaches:
+
+You could also use path-based routing instead of host-based:
+
+```yaml
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: tutorial.local
+    http:
+      paths:
+      - path: /dashboard
+        pathType: Prefix
+        backend:
+          service:
+            name: kubernetes-dashboard
+            port:
+              number: 443
+```
+
+This would make the Dashboard accessible at `http://tutorial.local/dashboard` instead of requiring a separate hostname. However, this approach has complications: the Dashboard expects to serve from the root path, so you'd need additional rewrite annotations and configuration.
+
+Clean up when done:
+
+```bash
+kubectl delete -f dashboard-ingress.yaml
+```
+
+## 4.11 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 

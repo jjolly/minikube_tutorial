@@ -92,15 +92,54 @@ What you should observe:
 - `kubectl get nodes` should show a node named `docker-desktop`
 - `kubectl cluster-info` should print API and service endpoints
 
-### 0.A.4 Enable ingress
+### 0.A.4 Installing Extras
 
-Docker Desktop's Kubernetes includes ingress support. Enable the NGINX ingress controller:
+When you enabled Kubernetes in Docker Desktop, you got a working control plane, a single node, and the core Kubernetes components needed to run basic workloads. But you didn't get everything. Kubernetes is deliberately minimal out of the box—cluster operators add only the features they need. This keeps the base system small and secure, but it means some useful capabilities aren't available by default.
+
+Docker Desktop's Kubernetes is missing at least two important features that this tutorial relies on:
+
+1. **Ingress** - for HTTP routing to multiple applications on the same host
+2. **Metrics API** - for seeing actual resource usage with `kubectl top`
+
+These features aren't included because they're optional. Some clusters don't need them, and there are multiple valid implementations to choose from. Instead of bundling every possible feature, Kubernetes expects you to add what you need.
+
+#### How features are added to Kubernetes
+
+Features in Kubernetes are typically added by applying manifests—YAML files that describe the desired state of your cluster. A single feature often requires multiple Kubernetes objects working together: Namespaces, ServiceAccounts, Roles, ConfigMaps, Deployments, Services, and more. These objects must be created in the right order with the right configuration, or the feature won't work.
+
+This is where **bundled manifests** become useful. Instead of manually creating each object one by one, you can apply a single YAML file that contains everything needed for a feature. The manifest authors have already figured out the correct order, configuration, and relationships between objects. You just apply it and Kubernetes makes it happen.
+
+Think of a bundled manifest like a furniture kit from IKEA: someone else has already figured out which screws go where and included all the parts. You just follow the instructions (apply the manifest) and trust that the pieces fit together.
+
+Both of these features will show up as new Pods running in your cluster. You'll be able to see them with `kubectl get pods --all-namespaces`, and they'll be serving traffic or collecting data shortly after you apply them. The tutorial will explain what these components actually do and how to use them when the time comes. For now, focus on understanding how they're installed and what happens during that process.
+
+---
+
+#### 0.A.4.1 Enable ingress
+
+By default, Kubernetes provides a way to route traffic within your cluster using **Services**, but Services have limitations when you want to expose multiple HTTP applications on the same port or host. That's where **Ingress** comes in.
+
+Ingress is a Kubernetes API object that manages external access to Services, typically HTTP. Ingress can provide load balancing, SSL termination, and name-based virtual hosting. Think of it as a smart reverse proxy that sits in front of your Services and routes incoming requests based on rules you define.
+
+Docker Desktop's Kubernetes doesn't include an ingress controller by default, so we'll install the NGINX Ingress Controller. This is a popular choice that implements the Ingress API using NGINX as a reverse proxy.
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 ```
 
-Wait for the ingress controller to be ready:
+What just happened:
+
+- `kubectl apply` submitted a manifest to the Kubernetes API server describing several related objects: a Namespace, ServiceAccounts, Roles, RoleBindings, ConfigMaps, a Deployment, and a Service
+- The API server stored these objects in etcd and acknowledged the request
+- The cluster controllers noticed the new objects and began working to make the desired state a reality:
+  - The Deployment controller created a ReplicaSet
+  - The ReplicaSet created Pods
+  - The Scheduler assigned those Pods to nodes
+  - The Kubelet on each node instructed the container runtime to start the ingress controller containers
+
+This process doesn't happen instantly. The ingress controller image must be pulled, the container must start, and it must pass its readiness probes before it can handle traffic.
+
+Wait for the ingress controller to become ready:
 
 ```bash
 kubectl wait --namespace ingress-nginx \
@@ -109,17 +148,58 @@ kubectl wait --namespace ingress-nginx \
   --timeout=90s
 ```
 
+What this command does:
+
+- `kubectl wait` blocks until the condition you specified is met or the timeout expires
+- `--namespace ingress-nginx` targets only the ingress-nginx namespace where we installed the controller
+- `--for=condition=ready pod` waits for Pods to report as "Ready"
+- `--selector=app.kubernetes.io/component=controller` filters to only the ingress controller Pods
+- `--timeout=90s` gives Kubernetes up to 90 seconds before giving up
+
+Why waiting matters:
+
+The ingress controller Pod goes through several phases after being created:
+1. **Pending**: The Pod is accepted but not yet scheduled to a node
+2. **ContainerCreating**: The image is being pulled and the container is starting
+3. **Running**: The container is running, but not yet ready to serve traffic
+4. **Ready**: The container passed its readiness probe and can handle requests
+
+Using `kubectl wait` ensures you don't try to use the ingress controller before it's actually ready.
+
 Verify the ingress controller is running:
 
 ```bash
 kubectl get pods -n ingress-nginx
 ```
 
-### 0.A.5 Enable metrics-server
+You should see a Pod with a name like `ingress-nginx-controller-xxxxx` in the `Ready` state.
+
+What you can now do with ingress:
+
+Later in the tutorial, you'll create an Ingress object that defines routing rules like "send requests for `/genkey/*` to the genkey Service" and "send requests for `/journal/*` to the journal Service." The ingress controller reads these rules from the Kubernetes API and reconfigures its NGINX reverse proxy accordingly, all without you needing to manually configure NGINX.
+
+---
+
+#### 0.A.4.2 Enable metrics-server
+
+Kubernetes can tell you the **resource requests** and **limits** you've set for your workloads—how much CPU and memory you've asked for or capped. But it doesn't inherently know how much CPU and memory your workloads are actually **using**. That's where **metrics-server** comes in.
+
+metrics-server is a cluster-wide aggregator of resource usage data. It collects metrics from the Kubelet on each node (which gets them from the cgroups that the container runtime uses) and exposes them through the Kubernetes Metrics API. Tools like `kubectl top` and the horizontal pod autoscaler depend on this data.
+
+Without metrics-server, running `kubectl top nodes` will return an error: "Metrics API not available." With metrics-server installed, you can see actual resource consumption and make informed decisions about scaling and capacity planning.
 
 ```bash
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
+
+What just happened:
+
+- Similar to ingress, we applied a manifest that creates the metrics-server components
+- A Deployment was created that runs the metrics-server Pod
+- This Pod runs a small Go program that continuously:
+  - Scrapes the Kubelet on each node for CPU and memory usage
+  - Caches this data in memory
+  - Serves it via the Metrics API
 
 You may need to patch metrics-server to work with Docker Desktop's container runtime:
 
@@ -127,18 +207,81 @@ You may need to patch metrics-server to work with Docker Desktop's container run
 kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
 ```
 
+Why this patch is sometimes needed:
+
+metrics-server connects to each Kubelet over HTTPS to fetch metrics. In some cluster configurations, including Docker Desktop's Kubernetes, the Kubelet serves a self-signed TLS certificate. The `--kubelet-insecure-tls` flag tells metrics-server to accept these certificates without full validation. This isn't recommended for production, but it's acceptable for a local learning environment.
+
 Wait a moment, then verify:
 
 ```bash
 kubectl top nodes
 ```
 
-What this does:
+What you're waiting for:
 
-- **ingress** provides the nginx ingress controller used later in the tutorial
-- **metrics-server** provides resource-usage data for commands such as `kubectl top`
+After applying the metrics-server manifest, several things need to happen before `kubectl top` works:
 
-### 0.A.6 Resetting the cluster
+1. The metrics-server Pod must be scheduled and started
+2. It must begin scraping metrics from the Kubelet
+3. The Metrics API must be registered and serving data
+4. The `kubectl top` command must be able to query that API successfully
+
+If you run `kubectl top nodes` immediately and see "Metrics API not available," it means one of these steps hasn't completed yet. Waiting 15-30 seconds is usually enough for metrics-server to start collecting and serving data. You can also watch the Pod startup with:
+
+```bash
+kubectl get pods -n kube-system -l k8s-app=metrics-server -w
+```
+
+Wait until the Pod shows as `Running` and `Ready` (usually 2/2), then try `kubectl top nodes` again.
+
+What you should see:
+
+```
+NAME             CPU(cores)   MEMORY(bytes)
+docker-desktop   123m         1234567K
+```
+
+This shows real-time CPU and memory usage for your node. The `m` suffix means "millicores" (thousandths of a CPU core), and `K` means kilobytes. Later, when you have application Pods running, `kubectl top pods -n <namespace>` will show resource usage for each Pod.
+
+What you can now do with metrics:
+
+- Use `kubectl top` to identify resource-hungry workloads
+- Learn how different applications behave under load
+- Understand the relationship between resource requests, limits, and actual usage
+- Set up Horizontal Pod Autoscalers (covered in advanced topics) that scale based on actual demand
+
+---
+
+#### 0.A.4.3 Verify dynamic storage provisioning
+
+The journal application later in this tutorial uses a **PersistentVolumeClaim (PVC)** to store SQL Server data. For this to work, your cluster needs a **StorageClass** that can dynamically provision storage when you create a PVC.
+
+Docker Desktop's Kubernetes includes a storage provisioner by default, but it's worth verifying before you reach the journal exercises.
+
+```bash
+kubectl get storageclass
+```
+
+What you should see:
+
+```
+NAME                 PROVISIONER            RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+standard (default)   docker.io/hostpath     Delete          Immediate           false                  XXd
+```
+
+Key things to verify:
+
+- A StorageClass exists (usually named `standard` or `hostpath`)
+- One StorageClass is marked as `(default)`—this is what PVCs use when you don't specify a class
+- The `PROVISIONER` column shows something other than `<none>`
+
+What this means for the tutorial:
+
+When you create a PVC in the journal exercises, the default StorageClass automatically creates a PersistentVolume backed by local storage. The database Pod can then mount this PVC, and its data persists even if the Pod is restarted.
+
+If no StorageClass exists or none is marked as default, the journal PVC will remain in `Pending` state and the database will fail to start.
+
+### 0.A.5 Resetting the cluster
 
 If you need to reset Kubernetes in Docker Desktop:
 
@@ -147,9 +290,9 @@ If you need to reset Kubernetes in Docker Desktop:
 3. Click **Reset Kubernetes Cluster**
 4. Confirm the reset
 
-After resetting, re-run the ingress and metrics-server steps from **0.A.4** and **0.A.5**.
+After resetting, re-run the steps from **0.A.4** to re-enable ingress and metrics-server, then verify storage provisioning in **0.A.4.3**.
 
-### 0.A.7 Building container images with Docker Desktop
+### 0.A.6 Building container images with Docker Desktop
 
 With Docker Desktop's Kubernetes, images you build with Docker are immediately available to the cluster—no special loading step required.
 
@@ -317,19 +460,117 @@ What you should observe:
 - `kubectl get nodes` should show a node named `minikube`
 - `kubectl cluster-info` should print API and service endpoints
 
-### 0.B.10 Enable ingress and metrics collection
+### 0.B.10 Installing required addons
 
-The tutorial uses two minikube addons early:
+Minikube includes several addons that extend cluster functionality. Three of these are needed for the tutorial: ingress, metrics-server, and dynamic storage provisioning.
+
+---
+
+#### 0.B.10.1 Enable ingress
+
+**What it does:**
+
+The ingress addon installs the NGINX Ingress Controller into your cluster. This controller reads Ingress objects (which define HTTP routing rules) and configures its internal NGINX reverse proxy to route requests to the appropriate Services.
+
+Without an ingress controller, Ingress objects you create later will have no effect—requests won't reach your applications.
 
 ```bash
 minikube addons enable ingress
+```
+
+What just happened:
+
+- Minikube deployed the NGINX Ingress Controller into the `ingress-nginx` namespace
+- A Service was created to expose the controller
+- The controller Pods are now watching for Ingress objects across all namespaces
+
+Verify the ingress controller is running:
+
+```bash
+kubectl get pods -n ingress-nginx
+```
+
+You should see a Pod with a name like `ingress-nginx-controller-xxxxx` in the `Running` and `Ready` state.
+
+---
+
+#### 0.B.10.2 Enable metrics-server
+
+**What it does:**
+
+Kubernetes can tell you the **resource requests** and **limits** you've set for your workloads—how much CPU and memory you've asked for or capped. But it doesn't inherently know how much CPU and memory your workloads are actually **using**. That's where **metrics-server** comes in.
+
+metrics-server is a cluster-wide aggregator of resource usage data. It collects metrics from the Kubelet on each node and exposes them through the Kubernetes Metrics API. Tools like `kubectl top` and the horizontal pod autoscaler depend on this data.
+
+```bash
 minikube addons enable metrics-server
 ```
 
-Why these addons are enabled:
+What just happened:
 
-- **ingress** provides the nginx ingress controller used later in the tutorial
-- **metrics-server** provides resource-usage data for commands such as `kubectl top`
+- Minikube deployed metrics-server into the `kube-system` namespace
+- A Deployment was created that runs the metrics-server Pod
+- This Pod continuously scrapes each node's Kubelet for CPU and memory usage
+
+Wait a moment, then verify:
+
+```bash
+kubectl top nodes
+```
+
+What you're waiting for:
+
+After enabling the addon, the metrics-server Pod must start and begin collecting data. If you run `kubectl top nodes` immediately and see "Metrics API not available," wait 15-30 seconds and try again.
+
+What you should see:
+
+```
+NAME       CPU(cores)   MEMORY(bytes)
+minikube   123m         1234567K
+```
+
+---
+
+#### 0.B.10.3 Enable dynamic storage provisioning
+
+**Note:** This step is specific to minikube. Docker Desktop and Kind include a storage provisioner by default, so this setup is only needed for minikube clusters.
+
+**What it does:**
+
+The journal application later in this tutorial uses a **PersistentVolumeClaim (PVC)** to store SQL Server data. For this to work, your cluster needs a **StorageClass** that can dynamically provision storage when you create a PVC.
+
+Without dynamic provisioning, a PVC you create will remain in `Pending` state waiting for an administrator to manually create storage. With it, storage is created automatically when requested.
+
+```bash
+minikube addons enable storage-provisioner
+minikube addons enable default-storageclass
+```
+
+What these addons do:
+
+- **storage-provisioner** runs a provisioner that watches for new PVCs and creates PersistentVolumes
+- **default-storageclass** ensures there's a StorageClass marked as default, so PVCs that don't specify a class use this one
+
+Verify storage is ready:
+
+```bash
+kubectl get storageclass
+```
+
+What you should see:
+
+```
+NAME                 PROVISIONER                RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+standard (default)   k8s.io/minikube-hostpath   Delete          Immediate           false                  XXd
+```
+
+Key things to verify:
+
+- A StorageClass exists (usually named `standard`)
+- One StorageClass is marked as `(default)`
+- The `PROVISIONER` column shows `k8s.io/minikube-hostpath`
+
+### 0.B.11 Resetting the cluster
 
 ### 0.B.11 Resetting the cluster
 
@@ -340,7 +581,7 @@ minikube delete
 minikube start --driver=docker
 ```
 
-After doing this, continue from **section 0.B.10** to re-enable addons.
+After doing this, continue from **section 0.B.10** to re-enable the ingress, metrics-server, and storage-provisioner addons.
 
 ### 0.B.12 Minikube profiles (optional)
 
@@ -386,66 +627,147 @@ Clean up when done:
 minikube delete -p multinode-lab
 ```
 
-### 0.B.14 Minikube addons worth exploring
+---
 
-Once you are comfortable with the basics, minikube addons are one of the easiest ways to keep experimenting. An addon is a prepackaged cluster feature that minikube knows how to enable and disable for you.
+## 0.C Useful Cluster Extensions
 
-```bash
-minikube addons list
-```
+Now that your cluster is running with ingress and metrics-server installed, you may want to explore additional extensions that enhance your local Kubernetes experience. These aren't required for the tutorial, but they're useful for experimentation and learning.
 
-Two important addons have already been used in this tutorial:
+Both Docker Desktop and Minikube support these extensions—the difference is how you install them. Minikube provides prepackaged "addons" that can be enabled with a single command, while Docker Desktop and other clusters use standard Kubernetes manifests or Helm charts.
 
-- `ingress` - enabled in **section 0.B.10**
-- `metrics-server` - enabled in **section 0.B.10**
+### 0.C.1 Kubernetes Dashboard
 
-Additional addons to explore:
+The Kubernetes Dashboard is a general-purpose, web-based UI for Kubernetes clusters. It allows you to manage and troubleshoot your cluster and applications without memorizing kubectl commands.
 
-1. **dashboard** - provides the Kubernetes Dashboard web UI
-   ```bash
-   minikube addons enable dashboard
-   minikube dashboard
-   ```
+**What it does:**
 
-2. **storage-provisioner** - provides dynamic storage provisioning for local PersistentVolumeClaims
-   ```bash
-   minikube addons enable storage-provisioner
-   ```
+- View cluster resources (Deployments, Pods, Services, etc.) in a graphical interface
+- Inspect logs and events without using the terminal
+- Launch simple terminal sessions into containers
+- Monitor resource usage in real-time
 
-3. **default-storageclass** - marks a storage class as the default choice for PVCs
-   ```bash
-   minikube addons enable default-storageclass
-   ```
-
-4. **registry** - provides an in-cluster container registry endpoint
-   ```bash
-   minikube addons enable registry
-   ```
-
-5. **metallb** - provides a software load-balancer for `LoadBalancer` Services
-   ```bash
-   minikube addons enable metallb
-   ```
-
-Enable an addon:
-```bash
-minikube addons enable <addon-name>
-```
-
-Disable an addon:
-```bash
-minikube addons disable <addon-name>
-```
-
-### 0.B.15 Building container images with minikube
-
-Minikube provides a convenient command for building images directly into the minikube image registry:
+**Docker Desktop / Kind:**
 
 ```bash
-minikube image build -t my-image:tag /path/to/build/context
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
 ```
 
-This is covered in more detail in the cluster usage examples section.
+**Minikube:**
+
+```bash
+minikube addons enable dashboard
+```
+
+**Create a login token:**
+
+Create a ServiceAccount with admin privileges and generate a bearer token:
+
+```bash
+kubectl create serviceaccount dashboard-admin -n kube-system
+kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=kube-system:dashboard-admin
+kubectl create token dashboard-admin -n kube-system --duration=87600h
+```
+
+Copy the token output - you'll need it to log in.
+
+**Start the proxy and access the Dashboard:**
+
+Start kubectl proxy in a terminal:
+
+```bash
+kubectl proxy
+```
+
+Keep this terminal running while you use the Dashboard. Then open in your browser:
+
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+Select "Token" as the authentication method and paste the token you generated.
+
+**Exploring the Dashboard:**
+
+Once logged in, you'll see an overview of the cluster. Try exploring the ingress controller you installed earlier:
+
+1. Select **ingress-nginx** from the namespace dropdown at the top of the screen
+2. Click **Workloads** in the left sidebar to see Deployments, Pods, and other resources in this namespace
+3. Click on any resource to view detailed information, including labels, annotations, events, and YAML
+
+Take time to explore what the Dashboard shows. You can view Services, ConfigMaps, Secrets, and more—all through the web interface. This visual exploration is a nice complement to the command-line tools you're learning throughout this tutorial.
+
+Everything you see in the Dashboard can also be retrieved with kubectl commands like `kubectl get`, `kubectl describe`, and `kubectl get -o yaml`. The Dashboard is just a more visual way to interact with the same cluster data. Some people prefer graphical interfaces for exploration and learning; others prefer the precision and scriptability of command-line tools.
+
+**Accessing without kubectl proxy:**
+
+The `kubectl proxy` command used above creates a local proxy to reach the Dashboard. For a more persistent setup, you can expose the Dashboard using Ingress or NodePort—similar to how applications are exposed in later sections of this tutorial. For example, using Ingress would give you a URL like `http://dashboard.local/` without needing to keep a proxy terminal running.
+
+Ingress and service exposure are covered in detail in **[Part 3, section 3.11: Ingress in the application example](03-cluster-usage-examples.md#311-ingress-in-the-application-example)**. You can apply the same patterns to the Dashboard once you're comfortable with those concepts.
+
+### 0.C.2 Local Container Registry
+
+A local container registry allows you to push and pull images within your cluster without relying on external registries like Docker Hub. This is useful for testing custom images and for environments with limited internet access.
+
+**What it does:**
+
+- Provides an in-cluster Docker registry at `registry:5000` or similar
+- Allows you to push images locally and pull them from your cluster
+- Useful for CI/CD pipelines and air-gapped environments
+
+**Docker Desktop / Kind:**
+
+Docker Desktop already shares your local Docker image store with the cluster, so you typically don't need a separate registry. If you do want one:
+
+```bash
+kubectl create namespace registry
+kubectl apply -n registry -f https://raw.githubusercontent.com/kubernetes/kubernetes/main/cluster/addons/registry/registry.yaml
+kubectl port-forward -n registry svc/registry 5000:5000
+```
+
+Then push images:
+
+```bash
+docker tag my-image:tag localhost:5000/my-image:tag
+docker push localhost:5000/my-image:tag
+```
+
+**Minikube:**
+
+```bash
+minikube addons enable registry
+```
+
+Access at: `registry:5000` or `localhost:5000` (port-forwarding required for localhost access)
+
+### 0.C.3 Discovery and Installation
+
+One of the most valuable skills in Kubernetes is finding and installing extensions that match your needs.
+
+**How to discover extensions:**
+
+- **Kubernetes documentation**: https://kubernetes.io/docs/concepts/extend-kubernetes/
+- **GitHub**: Search for specific tools (e.g., "kubernetes operator for X")
+- **Artifact Hub**: https://artifacthub.io/ - A catalog of Kubernetes packages
+- **Helm Hub**: https://helm.sh/ - Package manager for Kubernetes
+
+**Common installation methods:**
+
+1. **kubectl apply** - Direct YAML application (shown throughout this tutorial)
+2. **Helm** - Package manager that handles upgrades and rollbacks
+3. **Kustomize** - Template-free customization of YAML
+4. **Operators** - Application-specific controllers that manage complex software
+
+**Helm example (works on any cluster):**
+
+```bash
+# Install Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Add a chart repository
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Install a chart
+helm install my-ingress ingress-nginx/ingress-nginx
+```
 
 ---
 

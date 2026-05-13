@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-client-writer
+spec:
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "NFS Client Writer - $(date)" > /data/writer.txt
+          echo "This file was written by nfs-client-writer" >> /data/writer.txt
+          echo "Content:" && cat /data/writer.txt
+          echo "Sleeping for 5 minutes..."
+          sleep 300
+      volumeMounts:
+        - name: nfs-share
+          mountPath: /data
+  volumes:
+    - name: nfs-share
+      nfs:
+        server: nfs-server
+        path: /
