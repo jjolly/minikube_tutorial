@@ -1,19 +1,16 @@
 # Part 0. Cluster Setup
 
-This part gets you running with a local Kubernetes cluster. Choose the option that matches your environment:
+This part gets you running with a local Kubernetes cluster.
 
-- **Option A: Docker Desktop with Kubernetes** - Recommended for most users. Works with Docker Desktop on Windows or macOS. Simple GUI-based setup.
-- **Option B: Minikube** - Best for WSL environments without Docker Desktop. Highly flexible with multiple driver options.
-
-Both options use standard `kubectl` commands for the rest of the tutorial, so you can switch between them later if needed.
+This tutorial is written for Docker Desktop with Kubernetes. The core Kubernetes concepts you learn here apply universally—the control plane, scheduler, object model, and API work the same way in any Kubernetes environment. However, specific setup steps, particularly around image handling and cluster configuration, are unique to Docker Desktop and will be explicitly noted when they differ from the base Kubernetes behavior.
 
 ---
 
-## Option A: Docker Desktop with Kubernetes (Recommended)
+## Setting up Docker Desktop with Kubernetes
 
-Docker Desktop includes built-in Kubernetes support. This is the simplest way to get started if you're using Docker Desktop on Windows or macOS—you don't need to install kind or minikube separately.
+Docker Desktop includes built-in Kubernetes support. This is the simplest way to get started if you're using Docker Desktop on Windows or macOS.
 
-### 0.A.1 Prerequisites
+### 0.1 Prerequisites
 
 You should have:
 
@@ -22,7 +19,7 @@ You should have:
 - At least 4GB of memory allocated to Docker Desktop
 - Approximately 4GB of available disk space
 
-### 0.A.2 Install kubectl (if not already installed)
+### 0.2 Install kubectl (if not already installed)
 
 Docker Desktop's Kubernetes usually includes kubectl, but you may want to install it separately for the latest version.
 
@@ -53,7 +50,7 @@ which kubectl
 kubectl version --client
 ```
 
-### 0.A.3 Enable Kubernetes in Docker Desktop
+### 0.3 Enable Kubernetes in Docker Desktop
 
 **Step 1: Open Docker Desktop Settings**
 
@@ -92,7 +89,7 @@ What you should observe:
 - `kubectl get nodes` should show a node named `docker-desktop`
 - `kubectl cluster-info` should print API and service endpoints
 
-### 0.A.4 Installing Extras
+### 0.4 Installing Extras
 
 When you enabled Kubernetes in Docker Desktop, you got a working control plane, a single node, and the core Kubernetes components needed to run basic workloads. But you didn't get everything. Kubernetes is deliberately minimal out of the box—cluster operators add only the features they need. This keeps the base system small and secure, but it means some useful capabilities aren't available by default.
 
@@ -115,7 +112,7 @@ Both of these features will show up as new Pods running in your cluster. You'll 
 
 ---
 
-#### 0.A.4.1 Enable ingress
+#### 0.4.1 Enable ingress
 
 By default, Kubernetes provides a way to route traffic within your cluster using **Services**, but Services have limitations when you want to expose multiple HTTP applications on the same port or host. That's where **Ingress** comes in.
 
@@ -180,7 +177,7 @@ Later in the tutorial, you'll create an Ingress object that defines routing rule
 
 ---
 
-#### 0.A.4.2 Enable metrics-server
+#### 0.4.2 Enable metrics-server
 
 Kubernetes can tell you the **resource requests** and **limits** you've set for your workloads—how much CPU and memory you've asked for or capped. But it doesn't inherently know how much CPU and memory your workloads are actually **using**. That's where **metrics-server** comes in.
 
@@ -252,7 +249,7 @@ What you can now do with metrics:
 
 ---
 
-#### 0.A.4.3 Verify dynamic storage provisioning
+#### 0.4.3 Verify dynamic storage provisioning
 
 The journal application later in this tutorial uses a **PersistentVolumeClaim (PVC)** to store SQL Server data. For this to work, your cluster needs a **StorageClass** that can dynamically provision storage when you create a PVC.
 
@@ -281,7 +278,7 @@ When you create a PVC in the journal exercises, the default StorageClass automat
 
 If no StorageClass exists or none is marked as default, the journal PVC will remain in `Pending` state and the database will fail to start.
 
-### 0.A.5 Resetting the cluster
+### 0.5 Resetting the cluster
 
 If you need to reset Kubernetes in Docker Desktop:
 
@@ -292,7 +289,7 @@ If you need to reset Kubernetes in Docker Desktop:
 
 After resetting, re-run the steps from **0.A.4** to re-enable ingress and metrics-server, then verify storage provisioning in **0.A.4.3**.
 
-### 0.A.6 Building container images with Docker Desktop
+### 0.6 Building container images with Docker Desktop
 
 With Docker Desktop's Kubernetes, images you build with Docker are immediately available to the cluster—no special loading step required.
 
@@ -302,338 +299,11 @@ docker build -t my-image:tag /path/to/build/context
 
 The image is ready to use in Kubernetes deployments immediately.
 
----
-
-## Option B: Minikube (WSL-focused)
-
-Minikube is an alternative way to run a local Kubernetes cluster. It's especially useful in WSL environments where you don't have Docker Desktop, or when you need more flexibility in drivers and configuration.
-
-### 0.B.1 Prerequisites
-
-Assume you are starting at a Linux shell prompt and you are not yet sure what is installed, what is configured, or whether minikube is already running.
-
-You should assume only that:
-
-- you can log in as a normal user
-- you can use `sudo`
-- you are working inside WSL on either Ubuntu or openSUSE Leap
-
-### 0.B.2 Check what is already installed
-
-Before installing anything, inspect the environment.
-
-```bash
-uname -a
-cat /etc/os-release
-which docker
-which kubectl
-which minikube
-docker --version
-kubectl version --client
-minikube version
-```
-
-What this tells you:
-
-- `uname -a` confirms you are in a Linux environment
-- `/etc/os-release` tells you which distribution you are on
-- `which ...` checks whether a command is already on your `PATH`
-- the `--version` commands confirm whether the installed tools actually run
-
-### 0.B.3 Why this tutorial uses Docker as the minikube driver
-
-Minikube can run on top of different drivers and container runtimes. In practice, these are the options people often encounter first when using Kubernetes locally:
-
-- **Docker driver**
-  - usually the most straightforward local path when first setting things up
-  - familiar if you have seen container workflows before
-  - works well in WSL-based development setups
-- **Podman driver**
-  - viable in some environments
-  - attractive if you prefer a daemonless container tool
-  - less common in beginner minikube walkthroughs
-- **KVM/libvirt or other VM-based drivers**
-  - useful on full Linux systems
-  - solid, but usually more host setup than is helpful for a first tutorial in WSL
-- **none driver / bare-metal style setups**
-  - powerful, but usually not the best path when first learning Kubernetes
-
-This tutorial chooses **Docker** because it is usually the least surprising route in a WSL setup.
-
-### 0.B.4 Docker setup steps
-
-You will see these Docker-related steps below:
-
-- install the Docker package
-- start the Docker service when needed
-- add your user to the `docker` group
-- refresh your shell group membership with `newgrp docker`
-
-Why these steps are needed:
-
-- **install Docker** so minikube has a local container runtime/driver to use
-- **start the Docker service** so the Docker daemon is actually listening for work
-- **add your user to the `docker` group** so you do not have to prefix every Docker command with `sudo`
-- **run `newgrp docker`** so your current shell notices the new group membership without forcing a full logout/login cycle
-
-### 0.B.5 Ubuntu packages
-
-Install the basic tools used throughout the tutorial:
-
-```bash
-sudo apt update
-sudo apt install -y curl wget tar conntrack socat git ca-certificates
-```
-
-Install and configure Docker for this tutorial's minikube workflow:
-
-```bash
-sudo apt install -y docker.io
-sudo usermod -aG docker "$USER"
-newgrp docker
-```
-
-After that, verify Docker is usable from your current shell:
-
-```bash
-docker --version
-docker ps
-```
-
-### 0.B.6 openSUSE Leap packages
-
-Install the basic tools used throughout the tutorial:
-
-```bash
-sudo zypper refresh
-sudo zypper install -y curl wget tar conntrack-tools socat git ca-certificates
-```
-
-Install and configure Docker:
-
-```bash
-sudo zypper install -y docker
-sudo systemctl enable --now docker
-sudo usermod -aG docker "$USER"
-newgrp docker
-```
-
-After that, verify Docker is usable:
-
-```bash
-docker --version
-docker ps
-```
-
-### 0.B.7 Install kubectl
-
-`kubectl` is the command-line client for the Kubernetes API server.
-
-```bash
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-chmod +x kubectl
-sudo mv kubectl /usr/local/bin/
-kubectl version --client
-```
-
-### 0.B.8 Install minikube
-
-```bash
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
-minikube version
-```
-
-### 0.B.9 Start and verify the cluster
-
-Start minikube with Docker as the driver:
-
-```bash
-minikube start --driver=docker
-kubectl get nodes
-kubectl cluster-info
-```
-
-What you should observe:
-
-- `minikube start` should report that the cluster is starting and then running
-- `kubectl get nodes` should show a node named `minikube`
-- `kubectl cluster-info` should print API and service endpoints
-
-### 0.B.10 Installing required addons
-
-Minikube includes several addons that extend cluster functionality. Three of these are needed for the tutorial: ingress, metrics-server, and dynamic storage provisioning.
-
----
-
-#### 0.B.10.1 Enable ingress
-
-**What it does:**
-
-The ingress addon installs the NGINX Ingress Controller into your cluster. This controller reads Ingress objects (which define HTTP routing rules) and configures its internal NGINX reverse proxy to route requests to the appropriate Services.
-
-Without an ingress controller, Ingress objects you create later will have no effect—requests won't reach your applications.
-
-```bash
-minikube addons enable ingress
-```
-
-What just happened:
-
-- Minikube deployed the NGINX Ingress Controller into the `ingress-nginx` namespace
-- A Service was created to expose the controller
-- The controller Pods are now watching for Ingress objects across all namespaces
-
-Verify the ingress controller is running:
-
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-You should see a Pod with a name like `ingress-nginx-controller-xxxxx` in the `Running` and `Ready` state.
-
----
-
-#### 0.B.10.2 Enable metrics-server
-
-**What it does:**
-
-Kubernetes can tell you the **resource requests** and **limits** you've set for your workloads—how much CPU and memory you've asked for or capped. But it doesn't inherently know how much CPU and memory your workloads are actually **using**. That's where **metrics-server** comes in.
-
-metrics-server is a cluster-wide aggregator of resource usage data. It collects metrics from the Kubelet on each node and exposes them through the Kubernetes Metrics API. Tools like `kubectl top` and the horizontal pod autoscaler depend on this data.
-
-```bash
-minikube addons enable metrics-server
-```
-
-What just happened:
-
-- Minikube deployed metrics-server into the `kube-system` namespace
-- A Deployment was created that runs the metrics-server Pod
-- This Pod continuously scrapes each node's Kubelet for CPU and memory usage
-
-Wait a moment, then verify:
-
-```bash
-kubectl top nodes
-```
-
-What you're waiting for:
-
-After enabling the addon, the metrics-server Pod must start and begin collecting data. If you run `kubectl top nodes` immediately and see "Metrics API not available," wait 15-30 seconds and try again.
-
-What you should see:
-
-```
-NAME       CPU(cores)   MEMORY(bytes)
-minikube   123m         1234567K
-```
-
----
-
-#### 0.B.10.3 Enable dynamic storage provisioning
-
-**Note:** This step is specific to minikube. Docker Desktop and Kind include a storage provisioner by default, so this setup is only needed for minikube clusters.
-
-**What it does:**
-
-The journal application later in this tutorial uses a **PersistentVolumeClaim (PVC)** to store SQL Server data. For this to work, your cluster needs a **StorageClass** that can dynamically provision storage when you create a PVC.
-
-Without dynamic provisioning, a PVC you create will remain in `Pending` state waiting for an administrator to manually create storage. With it, storage is created automatically when requested.
-
-```bash
-minikube addons enable storage-provisioner
-minikube addons enable default-storageclass
-```
-
-What these addons do:
-
-- **storage-provisioner** runs a provisioner that watches for new PVCs and creates PersistentVolumes
-- **default-storageclass** ensures there's a StorageClass marked as default, so PVCs that don't specify a class use this one
-
-Verify storage is ready:
-
-```bash
-kubectl get storageclass
-```
-
-What you should see:
-
-```
-NAME                 PROVISIONER                RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
-standard (default)   k8s.io/minikube-hostpath   Delete          Immediate           false                  XXd
-```
-
-Key things to verify:
-
-- A StorageClass exists (usually named `standard`)
-- One StorageClass is marked as `(default)`
-- The `PROVISIONER` column shows `k8s.io/minikube-hostpath`
-
-### 0.B.11 Resetting the cluster
-
-### 0.B.11 Resetting the cluster
-
-If you ever want to reset the tutorial back to a clean cluster state:
-
-```bash
-minikube delete
-minikube start --driver=docker
-```
-
-After doing this, continue from **section 0.B.10** to re-enable the ingress, metrics-server, and storage-provisioner addons.
-
-### 0.B.12 Minikube profiles (optional)
-
-Minikube can manage more than one local cluster by using **profiles**. A profile is essentially a named minikube cluster instance.
-
-Why this can be useful:
-
-- one profile for tutorial experiments
-- another profile for unrelated application work
-- a clean profile for testing from scratch without disturbing an existing cluster
-
-```bash
-minikube profile list
-minikube start -p tutorial-lab --driver=docker
-minikube status -p tutorial-lab
-minikube delete -p tutorial-lab
-```
-
-Important idea:
-
-- a **profile** is broader than a Kubernetes namespace
-- **namespaces** separate resources *inside one cluster*
-- **profiles** separate entire local minikube clusters
-
-### 0.B.13 Multi-node minikube clusters (optional)
-
-The main tutorial uses a single-node minikube cluster, but minikube can also create a **multi-node** cluster.
-
-```bash
-minikube start -p multinode-lab --driver=docker --nodes 2
-kubectl config use-context multinode-lab
-kubectl get nodes -o wide
-```
-
-What to observe:
-
-- more than one node listed in `kubectl get nodes`
-- system Pods distributed across nodes
-
-Clean up when done:
-
-```bash
-minikube delete -p multinode-lab
-```
-
----
-
 ## 0.C Useful Cluster Extensions
 
 Now that your cluster is running with ingress and metrics-server installed, you may want to explore additional extensions that enhance your local Kubernetes experience. These aren't required for the tutorial, but they're useful for experimentation and learning.
 
-Both Docker Desktop and Minikube support these extensions—the difference is how you install them. Minikube provides prepackaged "addons" that can be enabled with a single command, while Docker Desktop and other clusters use standard Kubernetes manifests or Helm charts.
+Extensions are installed using standard Kubernetes manifests or Helm charts.
 
 ### 0.C.1 Kubernetes Dashboard
 
@@ -646,17 +316,13 @@ The Kubernetes Dashboard is a general-purpose, web-based UI for Kubernetes clust
 - Launch simple terminal sessions into containers
 - Monitor resource usage in real-time
 
-**Docker Desktop / Kind:**
+Install the Dashboard:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
 ```
 
-**Minikube:**
-
-```bash
-minikube addons enable dashboard
-```
+Docker Desktop's Kubernetes uses the standard kubectl apply method for extensions. Other cluster environments may provide alternative installation methods.
 
 **Create a login token:**
 
@@ -712,9 +378,7 @@ A local container registry allows you to push and pull images within your cluste
 - Allows you to push images locally and pull them from your cluster
 - Useful for CI/CD pipelines and air-gapped environments
 
-**Docker Desktop / Kind:**
-
-Docker Desktop already shares your local Docker image store with the cluster, so you typically don't need a separate registry. If you do want one:
+Docker Desktop's Kubernetes shares your local Docker image store with the cluster, so images you build are immediately available without a separate registry. If you do want an in-cluster registry for testing or CI/CD workflows:
 
 ```bash
 kubectl create namespace registry
@@ -728,14 +392,6 @@ Then push images:
 docker tag my-image:tag localhost:5000/my-image:tag
 docker push localhost:5000/my-image:tag
 ```
-
-**Minikube:**
-
-```bash
-minikube addons enable registry
-```
-
-Access at: `registry:5000` or `localhost:5000` (port-forwarding required for localhost access)
 
 ### 0.C.3 Discovery and Installation
 
@@ -771,29 +427,10 @@ helm install my-ingress ingress-nginx/ingress-nginx
 
 ---
 
-## Image Building Summary
-
-When you reach the sections that require building container images, the approach differs:
-
-**Docker Desktop (Option A):**
-```bash
-docker build -t my-image:tag /path/to/build/context
-# Image is immediately available - no extra step needed
-```
-
-**Minikube (Option B):**
-```bash
-minikube image build -t my-image:tag /path/to/build/context
-```
-
-Both approaches get your custom images into the cluster so Kubernetes can use them.
-
----
-
 ## Next Steps
 
 Once your cluster is running and you've verified connectivity:
 
 Continue to **[Part 1. Infrastructure and kubectl](01-infrastructure-and-kubectl.md)** to learn about the Kubernetes control plane, nodes, and core cluster services.
 
-The rest of the tutorial uses standard `kubectl` commands that work identically on both Docker Desktop and minikube clusters.
+The rest of the tutorial uses standard `kubectl` commands.
