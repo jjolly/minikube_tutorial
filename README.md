@@ -4,7 +4,7 @@ This tutorial has been split into modules so it is easier to work through in sta
 
 The original material is organized into five parts:
 
-0. **Cluster Setup** - Choose your local Kubernetes environment (Docker Desktop or Minikube)
+0. **Cluster Setup** - Set up your local Kubernetes environment
 1. **Infrastructure and kubectl** - Learn about the Kubernetes control plane, nodes, and core services
 2. **Typical cluster functionality and usage**
 3. **Cluster usage examples**
@@ -66,7 +66,7 @@ How to use this layout:
 
 ## Modules
 
-- [Part 0. Cluster Setup](tutorial/00-cluster-setup.md) - Choose Docker Desktop or Minikube
+- [Part 0. Cluster Setup](tutorial/00-cluster-setup.md) - Set up your local Kubernetes cluster
 - [Part 1. Infrastructure and kubectl](tutorial/01-infrastructure-and-kubectl.md)
 - [Part 2. Typical cluster functionality and usage](tutorial/02-typical-cluster-functionality-and-usage.md)
 - [Part 3. Cluster usage examples](tutorial/03-cluster-usage-examples.md)
@@ -76,7 +76,7 @@ How to use this layout:
 
 If you are new to Kubernetes, read the modules in order:
 
-1. Start with **Part 0** to set up your cluster (choose Docker Desktop or Minikube)
+1. Start with **Part 0** to set up your local cluster
 2. Continue with **Part 1** to understand Kubernetes infrastructure
 3. Work through **Parts 2 and 3** for core concepts and examples
 4. Explore **Part 4** for advanced topics
