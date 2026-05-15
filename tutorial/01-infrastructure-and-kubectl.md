@@ -366,9 +366,8 @@ Interactive shell access:
 For debugging, you often want an interactive shell inside the container:
 
 ```bash
-kubectl exec <pod-name> --it -- /bin/bash       # Interactive bash shell
-kubectl exec <pod-name> --it -- /bin/sh         # Interactive sh (for alpine/minimal images)
-kubectl exec <pod-name> --it -- /bin/sh         # Try sh if bash isn't available
+kubectl exec <pod-name> -it -- /bin/bash       # Interactive bash shell
+kubectl exec <pod-name> -it -- /bin/sh         # Interactive sh (for alpine/minimal images)
 ```
 
 The `--it` flags combine `-i` (interactive, keep STDIN open) and `-t` (TTY, allocate a terminal). You'll need both for an interactive shell.
