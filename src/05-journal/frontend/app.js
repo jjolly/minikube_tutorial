@@ -18,7 +18,19 @@ async function renderList() {
   layout(`
     <h2>Entries</h2>
     <ul>
-      ${items.map(item => `<li><a href="#/entry/${item.id}">${item.title}</a> <small>${new Date(item.createdAt).toLocaleString()}</small></li>`).join('')}
+      ${items.map(item => {
+        const escapedTitle = item.title.replace(/[&<>"'`=\/]/g, s => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+          '`': '&#96;',
+          '=': '&#61;',
+          '/': '&#47;'
+        })[s]);
+        return `<li><a href="#/entry/${item.id}">${escapedTitle}</a> <small>${new Date(item.createdAt).toLocaleString()}</small></li>`;
+      }).join('')}
     </ul>
   `);
 }
