@@ -35,7 +35,19 @@ data:
     async function renderList() {
       const res = await fetch('/journal/api/entries');
       const items = await res.json();
-      layout(`<h2>Entries</h2><ul>${items.map(item => `<li><a href="#/entry/${item.id}">${escapeHtml(item.title)}</a> <small>${new Date(item.createdAt).toLocaleString()}</small></li>`).join('')}</ul>`);
+      layout(`<h2>Entries</h2><ul id="entry-list"></ul>`);
+      const ul = document.getElementById('entry-list');
+      items.forEach(item => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = `#/entry/${item.id}`;
+        a.textContent = item.title;
+        const small = document.createElement('small');
+        small.textContent = ` ${new Date(item.createdAt).toLocaleString()}`;
+        li.appendChild(a);
+        li.appendChild(small);
+        ul.appendChild(li);
+      });
     }
     async function renderEntry(id) {
       const res = await fetch(`/journal/api/entries/${id}`);
