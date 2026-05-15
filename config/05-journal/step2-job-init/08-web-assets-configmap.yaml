@@ -26,7 +26,7 @@ data:
     async function renderList() {
       const res = await fetch('/journal/api/entries');
       const items = await res.json();
-      layout(`<h2>Entries</h2><ul>${items.map(item => `<li><a href="#/entry/${item.id}">${item.title}</a> <small>${new Date(item.createdAt).toLocaleString()}</small></li>`).join('')}</ul>`);
+      layout(`<h2>Entries</h2><ul>${items.map(item => `<li><a href="#/entry/${item.id}">${escapeHtml(item.title)}</a> <small>${new Date(item.createdAt).toLocaleString()}</small></li>`).join('')}</ul>`);
     }
     async function renderEntry(id) {
       const res = await fetch(`/journal/api/entries/${id}`);
@@ -64,3 +64,11 @@ data:
     input, textarea { width: 100%; padding: 0.75rem; box-sizing: border-box; }
     button { padding: 0.8rem 1.2rem; cursor: pointer; }
     .entry-body { white-space: pre-wrap; background: #fafafa; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
