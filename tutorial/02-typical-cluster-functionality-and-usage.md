@@ -1363,4 +1363,559 @@ If your storage class uses `Delete` reclaim behavior, the backing storage is usu
 
 A PVC is a request, not the storage implementation itself. In minikube, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
 
+## 2.20 Understanding the complete Kubernetes object hierarchy
+
+Throughout Part 2, you have learned about Pods, Deployments, Services, ConfigMaps, Secrets, and PersistentVolumeClaims. These objects don't exist in isolation—they form a hierarchy where higher-level objects create and manage lower-level objects.
+
+This section walks through the complete chain from Deployment down to Container and Storage, using `kubectl describe` at each level. This is also where we examine **ReplicaSets**, which you may have noticed in your cluster but haven't been explicitly discussed yet.
+
+### 2.20.1 Kubernetes controllers and their responsibilities
+
+Before creating resources, it helps to understand which Kubernetes components do what:
+
+| Component | What it does |
+|-----------|--------------|
+| **API Server** | Accepts YAML/commands, validates them, stores state in etcd |
+| **etcd** | Key-value store holding all cluster state (Deployments, Pods, Services, etc.) |
+| **Deployment controller** | Watches Deployments, creates/updates ReplicaSets to match desired state |
+| **ReplicaSet controller** | Watches ReplicaSets, creates/deletes Pods to maintain replica count |
+| **kube-scheduler** | Watches unscheduled Pods, assigns them to nodes based on resources/affinity |
+| **kubelet** | Runs on each node, manages Pod lifecycle, reports status to API server |
+| **kube-proxy** | Manages network rules for Services, load-balances traffic to Pods |
+| **PersistentVolume controller** | Binds PVCs to PVs, provisions storage if using dynamic provisioning |
+| **Container runtime** (containerd/docker) | Pulls images, starts/stops containers on the node |
+
+### 2.20.2 Setup: Create a Deployment with all components
+
+First, let's create a Deployment that uses ConfigMaps, Secrets, and PVCs so we can trace through everything:
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hierarchy-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head><title>Hierarchy Demo</title></head>
+    <body>
+      <h1>Kubernetes Hierarchy Demo</h1>
+      <p>This page is served from a ConfigMap!</p>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hierarchy-secret
+type: Opaque
+stringData:
+  username: admin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hierarchy-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hierarchy-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hierarchy
+  template:
+    metadata:
+      labels:
+        app: hierarchy
+    spec:
+      containers:
+        - name: main
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          env:
+            - name: APP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hierarchy-secret
+                  key: username
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+            - name: data
+              mountPath: /data
+        - name: sidecar
+          image: busybox:1.36
+          env:
+            - name: SECRET_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hierarchy-secret
+                  key: username
+          command: ["sh", "-c", "while true; do echo \"Running as user: $SECRET_USER\"; sleep 60; done"]
+      volumes:
+        - name: html
+          configMap:
+            name: hierarchy-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: hierarchy-data
+EOF
+```
+
+Wait for everything to be ready:
+
+```bash
+kubectl rollout status deployment/hierarchy-demo
+kubectl get all -l app=hierarchy
+```
+
+Verify the resources are working:
+
+**Test the HTML page served from ConfigMap:**
+
+```bash
+POD=$(kubectl get pods -l app=hierarchy -o jsonpath='{.items[0].metadata.name}')
+kubectl port-forward pod/$POD 8080:80
+```
+
+In another terminal:
+
+```bash
+curl http://127.0.0.1:8080
+```
+
+Expected response: HTML page served from the ConfigMap
+
+**Check the sidecar printing the secret username:**
+
+```bash
+kubectl logs $POD -c sidecar
+```
+
+Expected output: `Running as user: admin`
+
+**Verify the PVC is mounted:**
+
+```bash
+kubectl exec $POD -- ls -la /data
+```
+
+### 2.20.3 The complete hierarchy tree
+
+Here's how all the pieces fit together for the resources we just created:
+
+```text
+Deployment/hierarchy-demo                      (managed by Deployment controller)
+    |
+    | (selector: app=hierarchy)
+    |
+    v
+ReplicaSet/hierarchy-demo-85b94c6f7d          (managed by ReplicaSet controller)
+    |
+    | (pod template with labels: app=hierarchy)
+    |
+    +----> Pod/hierarchy-demo-85b94c6f7d-abc12
+    |         |
+    |         | (controlled by: ReplicaSet/hierarchy-demo-85b94c6f7d)
+    |         | (scheduled by: kube-scheduler)
+    |         | (monitored by: kubelet)
+    |         |
+    |         +----> Container/main             (nginx:1.27-alpine)
+    |         |         |
+    |         |         | (env: APP_USER from Secret/hierarchy-secret)
+    |         |         | (mounts: html → ConfigMap/hierarchy-config)
+    |         |         | (mounts: data → PVC/hierarchy-data)
+    |         |
+    |         +----> Container/sidecar           (busybox:1.36)
+    |                   |
+    |                   | (env: SECRET_USER from Secret/hierarchy-secret)
+    |
+    +----> Pod/hierarchy-demo-85b94c6f7d-def34
+              |
+              | (uses same PVC, ConfigMap, Secret as sibling pod)
+              |
+              +----> Container/main
+              +----> Container/sidecar
+
+ConfigMap/hierarchy-config                     (stored in etcd, mounted to /usr/share/nginx/html)
+    |
+    | (data: index.html - HTML page served by nginx)
+    |
+    +----> Mounted into both Pods as read-only files
+
+Secret/hierarchy-secret                        (stored in etcd, injected as env vars)
+    |
+    | (data: username=admin)
+    |
+    +----> Injected into main containers as APP_USER
+    +----> Injected into sidecar containers as SECRET_USER
+
+PVC/hierarchy-data                             (managed by PersistentVolume controller)
+    |
+    | (bound to PV)
+    |
+    v
+PersistentVolume/pvc-<uuid>                   (backed by storage provisioner)
+    |
+    | (100Mi, ReadWriteOnce)
+    |
+    +----> Mounted into both Pods at /data
+```
+
+**Key relationships shown in this tree:**
+
+- **Deployment → ReplicaSet:** One-to-many. Deployment can have multiple ReplicaSets during rolling updates.
+- **ReplicaSet → Pod:** One-to-many. ReplicaSet maintains a specific number of Pod replicas.
+- **Pod → Container:** One-to-many. A Pod can contain multiple containers that share the same lifecycle.
+- **ConfigMap/Secret → Pod:** Many-to-many. Multiple Pods can reference the same ConfigMap or Secret.
+- **PVC → PV:** One-to-one. Each PVC binds to exactly one PV.
+- **PVC → Pod:** Many-to-many. Multiple Pods can mount the same PVC (if access mode allows).
+
+### 2.20.4 Level 1: The Deployment
+
+Start at the top. The Deployment is the declarative entry point:
+
+```bash
+kubectl describe deployment hierarchy-demo
+```
+
+**Key output sections and what they mean:**
+
+**Name and Namespace:**
+- `Name: hierarchy-demo` - Your Deployment's identifier
+- `Namespace: tutorial` - Isolation boundary
+
+**Replicas:**
+- `Replicas: 2 desired | 2 updated | 2 total | 2 available | 0 unavailable`
+- This shows the **Deployment controller** has successfully created 2 replicas
+
+**Selector:**
+- `Selector: app=hierarchy`
+- This label selector is how the Deployment finds its child ReplicaSets
+- **Who uses this:** The Deployment controller queries the API server for ReplicaSets matching this selector
+
+**Strategy:**
+- `StrategyType: RollingUpdate`
+- `RollingUpdate: max unavailable=25%, max surge=25%`
+- This controls how the Deployment controller performs updates
+
+**Pod Template:**
+- Shows the template used to create Pods
+- **Who uses this:** The Deployment controller creates a ReplicaSet with this template hashed into its name
+
+**NewReplicaSet:**
+- `NewReplicaSet: hierarchy-demo-<hash>` (e.g., `hierarchy-demo-85b94c6f7d`)
+- **Who creates this:** The Deployment controller created this ReplicaSet
+- The hash comes from the Pod template contents—if the template changes, a new ReplicaSet with a different hash is created
+
+**Events:**
+```
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  15m   deployment-controller  Scaled up replica set hierarchy-demo-85b94c6f7d to 2
+```
+- **Who writes this:** The Deployment controller
+
+**Next step:** Note the ReplicaSet name from "NewReplicaSet"—that's our next level down.
+
+### 2.20.5 Level 2: The ReplicaSet
+
+The ReplicaSet is the reconciliation layer that ensures the right number of Pods exist:
+
+```bash
+kubectl get replicaset -l app=hierarchy
+REPLICASET=$(kubectl get replicaset -l app=hierarchy -o jsonpath='{.items[0].metadata.name}')
+kubectl describe replicaset $REPLICASET
+```
+
+**Key output sections:**
+
+**Owner References:**
+- Shows it's owned by the Deployment `hierarchy-demo`
+- **Who sets this:** The Deployment controller when creating the ReplicaSet
+
+**Replicas:**
+- `Replicas: 2 current / 2 desired`
+- **Who maintains this:** The ReplicaSet controller constantly reconciles Pod count
+
+**Pod Template:**
+- Same template from the Deployment (stored in the ReplicaSet spec)
+- **Who uses this:** The ReplicaSet controller creates Pods matching this template
+
+**Events:**
+```
+Events:
+  Type    Reason            Age   From                    Message
+  ----    ------            ----  ----                    -------
+  Normal  SuccessfulCreate  15m   replicaset-controller  Created pod: hierarchy-demo-85b94c6f7d-abc12
+  Normal  SuccessfulCreate  15m   replicaset-controller  Created pod: hierarchy-demo-85b94c6f7d-def34
+```
+- **Who writes this:** The ReplicaSet controller
+
+**Next step:** The Events show the Pod names that were created—those are our next level.
+
+### 2.20.6 Level 3: The Pod
+
+The Pod is the execution unit—the thing actually running on a node:
+
+```bash
+kubectl get pods -l app=hierarchy
+POD=$(kubectl get pods -l app=hierarchy -o jsonpath='{.items[0].metadata.name}')
+kubectl describe pod $POD
+```
+
+**Key output sections:**
+
+**Controlled By:**
+- `Controlled By: ReplicaSet/hierarchy-demo-85b94c6f7d`
+- **Who set this:** The ReplicaSet controller when creating the Pod
+
+**Node:**
+- `Node: desktop-worker/172.18.0.2` (or similar)
+- **Who assigned this:** kube-scheduler chose this node based on resources, affinity, taints/tolerations
+
+**Priority and Priority Class:**
+- Influences scheduling order when resources are scarce
+
+**Labels:**
+- `app=hierarchy` - matches the ReplicaSet selector
+- **Who uses this:** The ReplicaSet controller queries for Pods with these labels
+
+**Status:**
+- `Phase: Running`
+- `Conditions:` with PodReady, Initialized, PodScheduled, etc.
+- **Who updates this:** kubelet on the node reports Pod status to API server
+
+**IP:**
+- `IP: 10.244.0.45` - The Pod's unique IP within the cluster
+- **Who assigns this:** The kubelet (with help from the CNI plugin)
+
+**Containers:**
+- Lists `main` and `sidecar` containers
+- Each shows State, Ready, Restart Count, etc.
+- **Who manages these:** kubelet tells the container runtime to start/stop containers
+
+**Mounts:**
+- Shows ConfigMap mounts at `/etc/config`, PVC at `/data`
+- **Who performs these mounts:** kubelet mounts these before starting the container
+
+**Volumes:**
+- Shows the volume definitions
+- `config` → ConfigMap `hierarchy-config`
+- `data` → PersistentVolumeClaim `hierarchy-data`
+
+**Events:**
+```
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  15m   default-scheduler  Successfully assigned tutorial/hierarchy-demo-85b94c6f7d-abc12 to desktop-worker
+  Normal  Pulling    15m   kubelet            Pulling image "nginx:1.27-alpine"
+  Normal  Pulled     15m   kubelet            Successfully pulled image "nginx:1.27-alpine"
+  Normal  Created    15m   kubelet            Created container main
+  Normal  Started    15m   kubelet            Started container main
+```
+- **Who writes this:** kubelet (reporting what it's doing)
+
+**Next step:** Look at the Containers section for container-level details, or check the PVC binding.
+
+### 2.20.7 Level 4: The Container
+
+Within the Pod's `describe` output, find the Containers section. Each container has detailed status:
+
+```
+Containers:
+  main:
+    Container ID:  containerd://abc123...
+    Image:         nginx:1.27-alpine
+    Image ID:      docker.io/library/nginx@sha256:...
+    State:         Running
+      Started:      Wed, 14 May 2026 10:30:00 -0600
+    Ready:         True
+    Restart Count:  0
+    Environment:
+      APP_USER:     admin  (from Secret)
+    Mounts:
+      /etc/config from config (rw)
+      /data from data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-... (ro)
+```
+
+**Who does what at this level:**
+
+- **Container ID:** Assigned by container runtime when starting the container
+- **State updates:** kubelet polls container runtime and reports to API server
+- **Environment variables:** kubelet injects these from Secret/ConfigMap before starting container
+- **Mounts:** kubelet performs these mounts before starting container
+- **Restart:** kubelet restarts crashed containers based on restart policy
+
+### 2.20.8 Level 5: PersistentVolumeClaim and PersistentVolume
+
+The PVC shows how storage is provisioned and bound:
+
+```bash
+kubectl describe pvc hierarchy-data
+```
+
+**Key output:**
+
+**Status:**
+- `Status: Bound` - Successfully bound to a PV
+- **Who bound it:** PersistentVolume controller watched for matching PVs and created the binding
+
+**Volume:**
+- `Volume: pvc-<uuid>` - The name of the bound PV
+- If using dynamic provisioning, this PV was created automatically
+
+**Capacity:**
+- `Capacity: 100Mi` - Requested and granted size
+
+**Access Modes:**
+- `Access Modes: RWO` - ReadWriteOnce
+
+**Events:**
+```
+Events:
+  Type    Reason                Age   From                             Message
+  ----    ------                ----  ----                             -------
+  Normal  Provisioning          15m   persistentvolume-controller  Waiting for a volume to be created
+  Normal  ProvisioningSucceeded  15m   persistentvolume-controller  Successfully provisioned volume pvc-123
+```
+- **Who writes this:** PersistentVolume controller and external provisioner
+
+You can also describe the bound PV:
+
+```bash
+PV=$(kubectl get pvc hierarchy-data -o jsonpath='{.spec.volumeName}')
+kubectl describe pv $PV
+```
+
+### 2.20.9 Level 6: ConfigMap and Secret
+
+**ConfigMap:**
+
+```bash
+kubectl describe configmap hierarchy-config
+```
+
+**What you'll see:**
+- **Data:** Shows `index.html` with the HTML content
+- **Who stores this:** API server stored this in etcd when you applied the manifest
+- **Who uses it:** kubelet mounts this as a file at `/usr/share/nginx/html` in the main container
+
+**Verify it's being served:**
+
+```bash
+kubectl port-forward deployment/hierarchy-demo 8080:80
+# In another terminal:
+curl http://127.0.0.1:8080
+```
+
+**Secret:**
+
+```bash
+kubectl describe secret hierarchy-secret
+```
+
+**What you'll see:**
+- **Data:** Shows the `username` key (value is base64-encoded)
+- **Who stores this:** API server stored this in etcd
+- **Important:** Secret data is NOT encrypted in etcd by default—only base64-encoded
+- **Who uses it:** kubelet injects these as environment variables:
+  - `APP_USER` in the main container
+  - `SECRET_USER` in the sidecar container
+
+**Verify the sidecar is using the secret:**
+
+```bash
+kubectl logs deployment/hierarchy-demo -c sidecar
+```
+
+Expected output: `Running as user: admin` (repeated every 60 seconds)
+
+### 2.20.10 Tracing the request path
+
+When you `kubectl apply` a Deployment, here's the request flow:
+
+1. **kubectl → API Server:** Your YAML is sent to the API server
+2. **API Server → etcd:** API server validates and stores the Deployment object
+3. **Deployment Controller:** Watches etcd, notices new Deployment
+4. **Deployment Controller → API Server:** Creates a ReplicaSet
+5. **ReplicaSet Controller:** Watches etcd, notices new ReplicaSet
+6. **ReplicaSet Controller → API Server:** Creates Pod objects
+7. **kube-scheduler:** Watches for unscheduled Pods, assigns to nodes
+8. **kubelet:** Watches for Pods assigned to its node, tells container runtime to start containers
+9. **Container Runtime:** Pulls images, starts containers
+10. **kubelet → API Server:** Reports Pod and container status back
+
+### 2.20.11 Why ReplicaSets are usually hidden
+
+You may have noticed we haven't needed to work with ReplicaSets directly in most of the tutorial. Here's why:
+
+- **Deployments are the higher-level abstraction:** You almost always want Deployments for rolling updates and rollbacks
+- **ReplicaSets are an implementation detail:** The Deployment controller creates and manages them for you
+- **Direct ReplicaSet use is rare:** Only when you need the simpler reconciliation behavior without Deployment features
+- **kubectl scales Deployments automatically:** When you scale a Deployment, it handles the ReplicaSet for you
+
+If you do need to work with ReplicaSets directly (for debugging or advanced scenarios):
+```bash
+kubectl get replicasets
+kubectl describe replicaset <name>
+kubectl scale replicaset <name> --replicas=3
+```
+
+### 2.20.12 The complete picture
+
+Putting it all together, here's how a single request flows through the Kubernetes control plane and onto a node:
+
+```text
+User Action:
+  kubectl apply -f deployment.yaml
+       |
+       v
+API Server (validates, stores in etcd)
+       |
+       v
+Controller Manager notices new Deployment
+  |-- Deployment Controller creates ReplicaSet
+  |-- ReplicaSet Controller creates Pods
+       |
+       v
+Scheduler notices unscheduled Pods
+  |-- kube-scheduler assigns Pods to nodes
+       |
+       v
+Kubelet on each node
+  |-- Watches for Pods assigned to that node
+  |-- Pulls images
+  |-- Mounts volumes (from PV provisioner, ConfigMap, Secret)
+  |-- Starts containers via container runtime
+  |-- Reports status back to API Server
+       |
+       v
+Running Application
+```
+
+### Clean up
+
+```bash
+kubectl delete deployment hierarchy-demo
+kubectl delete pvc hierarchy-data
+kubectl delete configmap hierarchy-config
+kubectl delete secret hierarchy-secret
+```
+
 ---
