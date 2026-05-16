@@ -9,7 +9,7 @@ data:
     <html lang="en">
       <head>
         <meta charset="utf-8" />
-        <title>Minikube Tutorial - Static Site</title>
+        <title>Kubernetes Tutorial - Static Site</title>
       </head>
       <body>
         <h1>nginx is serving this page from Kubernetes</h1>

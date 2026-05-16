@@ -2,7 +2,7 @@
 
 This part gives you a first look at the core infrastructure that makes Kubernetes work, along with the fundamental commands you'll use throughout the tutorial. It matters because the rest of the tutorial assumes you have a functioning Kubernetes environment and at least a basic mental model of the control plane, nodes, and cluster services.
 
-**Prerequisite:** You should have already set up your local cluster using **[Part 0. Cluster Setup](00-cluster-setup.md)** (either Docker Desktop with Kubernetes or Minikube).
+**Prerequisite:** You should have already set up your local cluster using **[Part 0. Cluster Setup](00-cluster-setup.md)** (Docker Desktop with Kubernetes).
 
 ## 1.1 Fundamental kubectl commands
 
@@ -586,10 +586,7 @@ kubectl describe node <your-node-name>
 kubectl get pods -n kube-system -o wide
 ```
 
-**Note:** Replace `<your-node-name>` with your actual node name. This is typically:
-- `docker-desktop` for Docker Desktop
-- `minikube` for Minikube
-- `tutorial-control-plane` for kind
+**Note:** Replace `<your-node-name>` with your actual node name. For Docker Desktop this is typically `docker-desktop`. Other cluster environments may use different node names.
 
 What these commands are showing:
 

@@ -67,72 +67,15 @@ kubectl delete -f config/05-journal/12-rbac-readonly.yaml
 
 ## 4.3 Managing multiple local clusters
 
-So far, the tutorial has used a single local cluster. But you may want to run multiple clusters for different purposes—separating tutorial work from other projects, or testing different configurations.
+Docker Desktop's Kubernetes runs a single cluster on your local machine. For most learning and development, this is sufficient—you can use namespaces to isolate different projects within the same cluster.
 
-### 4.3.1 Minikube: Using profiles
+If you need multiple completely separate clusters, other tools like **kind** (Kubernetes in Docker) can run alongside Docker Desktop. Each kind cluster is independent, with its own set of nodes and resources.
 
-Minikube can manage more than one local cluster by using **profiles**. A profile is essentially a named minikube cluster instance.
-
-Why this can be useful:
-
-- one profile for tutorial experiments
-- another profile for unrelated application work
-- a clean profile for testing from scratch without disturbing an existing cluster
-- a way to compare different addon or configuration choices
-
-Useful commands:
-
-```bash
-minikube profile list
-minikube start -p tutorial-lab --driver=docker
-minikube status -p tutorial-lab
-minikube delete -p tutorial-lab
-```
-
-What these commands do:
-
-- `minikube profile list`
-  - shows the profiles minikube knows about
-- `minikube start -p tutorial-lab --driver=docker`
-  - creates or starts a cluster named `tutorial-lab`
-- `minikube status -p tutorial-lab`
-  - checks the state of that specific cluster
-- `minikube delete -p tutorial-lab`
-  - removes that specific cluster
-
-Important idea:
-
-- a profile is broader than a Kubernetes namespace
-- **namespaces** separate resources *inside one cluster*
-- **profiles** separate entire local minikube clusters
-
-That means profiles are useful when you want stronger separation than a namespace can give. For example, you might use namespaces to separate tutorial resources from other workloads inside one cluster, but use profiles when you want completely independent clusters with different lifecycle, storage, addons, or experiments.
-
-For this tutorial, you do not need profiles to succeed. But once you start revisiting the tutorial, they can be a practical way to keep a clean lab environment without interfering with other minikube work.
-
-### Clean up
-
-If you created the example profile and no longer need it, remove it with:
-
-```bash
-minikube delete -p tutorial-lab
-```
-
-### 4.3.2 Docker Desktop / Kind: Multiple clusters
-
-Docker Desktop's Kubernetes runs a single cluster. To run multiple clusters with Docker Desktop installed, use **kind**:
-
-```bash
-kind create cluster --name tutorial-lab
-kubectl config get-contexts
-kind delete cluster --name tutorial-lab
-```
+Docker Desktop's Kubernetes makes your built images immediately available to the cluster. Other cluster environments may require different image handling approaches.
 
 ## 4.4 Multi-node local clusters
 
-The main tutorial uses a single-node local cluster because that is the clearest starting point. But both Minikube and Kind can create multi-node clusters, which is one of the easiest ways to get hands-on experience with scheduling across more than one node.
-
-The main tutorial uses a single-node minikube cluster because that is the clearest starting point. But minikube can also create a **multi-node** cluster, which is one of the easiest ways to get hands-on experience with scheduling across more than one node.
+The main tutorial uses a single-node local cluster because that is the clearest starting point. Local clusters can also create multi-node configurations, which provide hands-on experience with scheduling across more than one node.
 
 This is still a local lab. The additional nodes are not separate physical machines in the way they might be in a cloud or data-center environment. But they are still useful because Kubernetes now has more than one node to choose from when placing workloads.
 
@@ -149,46 +92,29 @@ This belongs in the advanced part of the tutorial because the main walkthrough d
 
 ### 4.4.2 Creating a multi-node cluster
 
-**Minikube:**
-```bash
-minikube start -p multinode-lab --driver=docker --nodes 2
-kubectl config use-context multinode-lab
-kubectl get nodes -o wide
-```
+Docker Desktop provides a straightforward way to run a multi-node cluster:
 
-**Kind:**
-```bash
-kind create cluster --name multinode-lab --nodes 3
-kubectl get nodes -o wide
-```
+1. Open Docker Desktop Settings
+2. Navigate to **Kubernetes**
+3. Adjust the **Kubernetes nodes** slider to your desired number of nodes (2-3 is a good starting point)
+4. Click **Apply & Restart**
 
-A common way to do this is to create a new profile so you do not disturb your existing tutorial cluster.
-
-For example:
+**Important:** Changing the number of Kubernetes nodes resets the cluster. You will need to re-apply essential manifests:
 
 ```bash
-minikube start -p multinode-lab --driver=docker --nodes 2
-kubectl config use-context multinode-lab
+# Re-enable ingress (required for later examples)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+
+# Re-create the tutorial namespace if needed
+kubectl create namespace tutorial
+
+# Verify your nodes
 kubectl get nodes -o wide
 ```
-
-What these commands do:
-
-- Create a multi-node cluster with 2-3 worker nodes
-- Switch to that cluster context
-- Confirm that more than one node is now present
 
 ### Clean up
 
-**Minikube:**
-```bash
-minikube delete -p multinode-lab
-```
-
-**Kind:**
-```bash
-kind delete cluster --name multinode-lab
-```
+If you want to return to a single-node cluster, use the Docker Desktop Settings → Kubernetes → Kubernetes nodes slider and adjust it back to 1.
 
 ### 4.4.3 What to observe once it is running
 
@@ -238,12 +164,6 @@ If you only created the sample Deployment for observation, remove it with:
 kubectl delete deployment hello-multi
 ```
 
-If you are done with the entire multi-node lab, you can remove the profile with:
-
-```bash
-minikube delete -p multinode-lab
-```
-
 ### 4.4.4 Important limitations of this experience
 
 It is still important to keep expectations realistic.
@@ -271,17 +191,7 @@ If you only created the sample Deployment for observation, remove it with:
 kubectl delete deployment hello-multi
 ```
 
-If you are done with the entire multi-node lab, you can remove the cluster:
-
-**Minikube:**
-```bash
-minikube delete -p multinode-lab
-```
-
-**Kind:**
-```bash
-kind delete cluster --name multinode-lab
-```
+If you are done with the entire multi-node lab, you can return to a single-node configuration using Docker Desktop Settings → Kubernetes → Kubernetes nodes.
 
 ## 4.5 Gateway and alternatives to Ingress
 
@@ -309,7 +219,7 @@ If you later want one advanced Gateway-focused extension, the best first options
 
 ## 4.6 Local cluster limitations and Kubernetes alternatives
 
-Local Kubernetes clusters (Docker Desktop, Minikube, Kind) are excellent for learning Kubernetes concepts, testing manifests, and experimenting with application behavior on a local machine. But they are still **local development clusters**, not a full substitute for every kind of Kubernetes environment.
+Local Kubernetes clusters are excellent for learning Kubernetes concepts, testing manifests, and experimenting with application behavior on a local machine. But they are still **local development clusters**, not a full substitute for every kind of Kubernetes environment.
 
 That does not make them "fake." They are real Kubernetes. But they are real Kubernetes in a very particular operating context: usually small, local, single-user, and optimized for experimentation.
 
@@ -384,7 +294,7 @@ What to expect if you later move from a local cluster to a managed service:
 
 ##### AKS example: exposing a Service with `type: LoadBalancer`
 
-One of the clearest differences between a local minikube lab and a managed cloud environment is how you expose an application.
+One of the clearest differences between a local development cluster and a managed cloud environment is how you expose an application.
 
 In Part 2, section 2.8 used `kubectl port-forward` because it is a quick and low-friction way to reach a Service from your local machine during a tutorial. In a production-oriented environment such as **Azure Kubernetes Service (AKS)**, a more typical pattern is to create a Service of type `LoadBalancer` and let the cloud provider allocate an external frontend for it.
 
@@ -436,7 +346,7 @@ Why this is different from `port-forward`:
 
 A practical note:
 
-- this pattern depends on cloud-provider integration, so it is normal in AKS, but it does **not** behave the same way in a plain local minikube cluster unless you separately add tooling such as MetalLB or use a different exposure method
+- this pattern depends on cloud-provider integration, so it is normal in AKS, but it does **not** behave the same way in a local cluster unless you separately add tooling such as MetalLB or use a different exposure method
 
 ###### Clean up
 
@@ -454,7 +364,7 @@ Examples include clusters built with:
 - distributions built around upstream Kubernetes installation workflows
 - self-managed clusters on bare metal, VMs, or homelab infrastructure
 
-What is different from minikube:
+What is different from local clusters:
 
 - you are more responsible for the cluster itself
 - networking, storage, upgrades, certificates, and control-plane health become much more your problem
@@ -486,15 +396,8 @@ What to expect:
 A practical comparison is:
 
 - **Docker Desktop with Kubernetes**
-  - best for Mac/Windows users who want a simple GUI-based setup
+  - simple GUI-based setup
   - strong integration with Docker workflows
-- **Minikube**
-  - best for WSL/Linux users who want flexible driver options
-  - strong for learning and local development
-- **Kind**
-  - strong for disposable test clusters and CI-oriented workflows
-- **k3s / similar lightweight distributions**
-  - strong for small servers, edge, labs, and lightweight deployments
 - **managed cloud Kubernetes**
   - strong when you want Kubernetes with provider-managed infrastructure and production-oriented integrations
 - **self-managed clusters**
@@ -535,11 +438,7 @@ Start with the broadest questions first.
 Useful commands:
 
 ```bash
-# Docker Desktop users: check Docker Desktop is running with Kubernetes enabled
-# Minikube users:
-minikube status
-
-# Both:
+# Check Docker Desktop is running with Kubernetes enabled
 kubectl config current-context
 kubectl cluster-info
 kubectl get nodes -o wide
@@ -547,31 +446,20 @@ kubectl get nodes -o wide
 
 What they help you answer:
 
-- `minikube status` (Minikube only)
-  - is the minikube cluster actually running?
-- `kubectl config current-context`
-  - is `kubectl` pointing at the context you think it is?
-- `kubectl cluster-info`
-  - can `kubectl` reach the cluster control plane?
-- `kubectl get nodes -o wide`
-  - is the node visible and reported as `Ready`?
+- is the cluster actually running?
+- is `kubectl` pointing at the context you think it is?
+- can `kubectl` reach the cluster control plane?
+- is the node visible and reported as `Ready`?
 
 Common problems these help catch:
 
 - Docker Desktop: Kubernetes is disabled in settings
-- Minikube: cluster is stopped
 - `kubectl` is pointing at the wrong cluster
 - the node is not ready
 - the API server is not reachable from your shell
 
 If the context appears stale after recreating a cluster:
 
-**Minikube:**
-```bash
-minikube update-context
-```
-
-**Docker Desktop / Kind:**
 ```bash
 kubectl config use-context <context-name>
 ```
@@ -586,7 +474,7 @@ Useful commands:
 # Get your node name first
 kubectl get nodes
 
-# Then describe it (replace <node-name> with docker-desktop, minikube, etc.)
+# Then describe it (replace <node-name> with docker-desktop)
 kubectl describe node <node-name>
 kubectl get pods -n kube-system -o wide
 kubectl get events -A --sort-by=.lastTimestamp
@@ -809,7 +697,6 @@ This matters because sometimes a Pod looks broken when the real failure is that 
 If you only remember a short list, remember these:
 
 ```bash
-minikube status
 kubectl config current-context
 kubectl get nodes -o wide
 kubectl get pods -A
@@ -840,11 +727,7 @@ For local clusters especially, it is also fair to ask a very practical question:
 
 - would it be faster and clearer to reset the cluster and restart?
 
-**Docker Desktop:** Reset Kubernetes cluster from Docker Desktop Settings → Kubernetes → Reset Kubernetes Cluster
-
-**Minikube:** `minikube delete && minikube start --driver=docker`
-
-**Kind:** `kind delete cluster --name tutorial && kind create cluster --name tutorial`
+Reset Kubernetes cluster from Docker Desktop Settings → Kubernetes → Reset Kubernetes Cluster
 
 Sometimes the answer is yes, especially in a learning environment.
 
@@ -1126,301 +1009,344 @@ kubectl delete pv nfs-data-pv
 
 If you want to remove the node-local directory as well:
 
-**Docker Desktop:**
 ```bash
 docker exec -it desktop-worker sh -c "rm -rf /nfs-data"
 ```
 
-**Minikube:**
-```bash
-minikube ssh "sudo rm -rf /nfs-data"
-```
-
-**Kind:**
-```bash
-docker exec -it tutorial-control-plane sh -c "rm -rf /nfs-data"
-```
-
 ## 4.8 Local cluster extensions
 
-Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, you may want to explore additional cluster features. The approach differs between Docker Desktop and Minikube.
+Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, you may want to explore additional cluster features. Docker Desktop's Kubernetes can be extended with standard Kubernetes manifests and Helm charts.
 
-### 4.8.1 Minikube: Ten addons worth exploring
+### 4.8.1 Portainer - Visual management interface
 
-Minikube addons are prepackaged cluster features that minikube knows how to enable and disable for you. They are useful because they let you try common Kubernetes components without manually installing every controller or supporting manifest yourself.
+Portainer provides a web-based UI for managing both Docker containers and Kubernetes resources. It integrates seamlessly with Docker Desktop.
 
-A good first command to know is:
+**What it does:**
+
+- Deploy and manage applications visually
+- View logs, resource usage, and container stats
+- Manage Docker volumes, networks, and images
+- Inspect Kubernetes resources across namespaces
+
+**Install Portainer:**
 
 ```bash
-minikube addons list
+# Create the namespace
+kubectl create namespace portainer
+
+# Deploy Portainer
+kubectl apply -n portainer -f https://raw.githubusercontent.com/portainer/k8s-yaml/main/manifests/portainer/portainer.yaml
 ```
 
-And the basic pattern for using an addon is:
+Wait for Portainer to start:
 
 ```bash
-minikube addons enable <addon-name>
-minikube addons disable <addon-name>
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=portainer -n portainer --timeout=120s
 ```
 
-Two important addons have already been used in this tutorial:
+**Access Portainer:**
 
-- `ingress`
-  - enabled in **section 1.1.10**
-  - used more fully in the application routing walkthrough in **section 3.11**
-- `metrics-server`
-  - enabled in **section 1.1.10**
-  - explained and used with `kubectl top` in **section 1.2.5**
-
-Those were introduced earlier because they were needed for the main walkthrough. The list below focuses on **additional addons** you can experiment with after the core tutorial, while still keeping a practical top-10 set overall.
-
-### 4.8.2 dashboard
-
-What it does:
-
-- provides the Kubernetes Dashboard web UI
-
-Why it is useful:
-
-- gives you a visual way to browse workloads, namespaces, and object status
-- useful when you want a second view alongside `kubectl`
-
-Basic use:
+Port-forward the service:
 
 ```bash
-minikube addons enable dashboard
-minikube dashboard
+kubectl port-forward -n portainer svc/portainer 9443:9443
 ```
 
-### 4.8.3 storage-provisioner
+Open in your browser: https://localhost:9443
 
-What it does:
+On first access, you'll be prompted to set an admin password.
 
-- provides dynamic storage provisioning for local PersistentVolumeClaims in minikube
+**Why this matters for Docker Desktop:**
 
-Why it is useful:
+Portainer bridges the gap between Docker's container management and Kubernetes resources. You can see everything from containers to Deployments in one interface, which is especially helpful during the transition from Docker Compose to Kubernetes workflows.
 
-- makes PVC examples easier because storage can be provisioned automatically
-- helps demonstrate persistent storage concepts without setting up a separate storage system
-
-Basic use:
+**Clean up:**
 
 ```bash
-minikube addons enable storage-provisioner
-kubectl get storageclass
-kubectl get pvc -A
+kubectl delete -n portainer -f https://raw.githubusercontent.com/portainer/k8s-yaml/main/manifests/portainer/portainer.yaml
+kubectl delete namespace portainer
 ```
 
-### 4.8.4 default-storageclass
+---
 
-What it does:
+### 4.8.2 MetalLB - LoadBalancer for local clusters
 
-- marks a storage class as the default choice for PVCs that do not specify one explicitly
+Local clusters don't have a cloud provider to allocate LoadBalancer IPs. MetalLB solves this by providing a network load-balancer implementation that works with standard Kubernetes LoadBalancer services.
 
-Why it is useful:
+**What it does:**
 
-- makes storage examples simpler
-- helps you understand how Kubernetes picks a storage class when none is named
+- Enables `type: LoadBalancer` services in local clusters
+- Allocates IP addresses from a configurable pool
+- Provides Layer 2 mode for simple local setups
 
-Basic use:
-
-```bash
-minikube addons enable default-storageclass
-kubectl get storageclass
-```
-
-### 4.8.5 registry
-
-What it does:
-
-- provides an in-cluster container registry endpoint for image workflows
-
-Why it is useful:
-
-- lets you experiment with image push/pull flows without depending entirely on remote registries
-- useful when learning how clusters consume custom images
-
-Basic use:
+**Install MetalLB:**
 
 ```bash
-minikube addons enable registry
-kubectl get svc -n kube-system
-```
-
-This one often benefits from reading the current minikube docs before deeper use, because local image workflow details can vary by driver and setup.
-
-### 4.8.6 registry-creds
-
-What it does:
-
-- helps configure registry credentials for pulling images from supported external registries
-
-Why it is useful:
-
-- useful when your experiments involve private images
-- shows how cluster image-pull behavior interacts with registry auth
-
-Basic use:
-
-```bash
-minikube addons enable registry-creds
-kubectl get pods -n kube-system
-```
-
-This addon is more interesting once you have a real registry workflow to test.
-
-### 4.8.7 volumesnapshots
-
-What it does:
-
-- enables snapshot-related Kubernetes resources used with compatible CSI storage drivers
-
-Why it is useful:
-
-- helps you explore more advanced storage ideas beyond "a PVC exists"
-- useful when you want to understand how storage backups and snapshots are modeled in Kubernetes
-
-Basic use:
-
-```bash
-minikube addons enable volumesnapshots
-kubectl api-resources | grep -i snapshot
-```
-
-### 4.8.8 csi-hostpath-driver
-
-What it does:
-
-- provides a CSI hostpath storage driver suitable for local testing and storage experiments
-
-Why it is useful:
-
-- lets you experiment with CSI-based storage behavior in a local lab
-- useful when you want to understand modern Kubernetes storage interfaces rather than only older in-tree behavior
-
-Basic use:
-
-```bash
-minikube addons enable csi-hostpath-driver
-kubectl get csidrivers
-kubectl get pods -A | grep csi || true
-```
-
-### 4.8.9 gvisor
-
-What it does:
-
-- enables the gVisor container sandbox runtime in supported environments
-
-Why it is useful:
-
-- gives you a way to experiment with stronger isolation tradeoffs
-- useful for learning that not all container runtime choices have the same security and performance profile
-
-Basic use:
-
-```bash
-minikube addons enable gvisor
-kubectl get runtimeclass
-```
-
-This is more advanced than the others because it leads into runtime-class and sandboxing topics.
-
-### 4.8.10 logviewer
-
-What it does:
-
-- provides a simple web UI for viewing logs from workloads in the cluster
-
-Why it is useful:
-
-- gives another way to inspect application behavior
-- can be a nice complement to `kubectl logs` during experimentation
-
-Basic use:
-
-```bash
-minikube addons enable logviewer
-minikube service logviewer -n kube-system
-```
-
-### 4.8.11 metallb
-
-What it does:
-
-- provides a software load-balancer implementation for bare-metal or local-cluster style environments
-- assigns external IPs to Services of type `LoadBalancer` so they don't remain in `<pending>` state
-
-Why it is useful:
-
-- helps you experiment with `LoadBalancer` Services in an environment that does not have a cloud-provider load balancer by default
-- useful when you want to better understand how service exposure differs between local clusters and cloud clusters
-- covered in the AKS example at **section 4.6.3**, where cloud LoadBalancers are discussed
-
-**Minikube:**
-
-```bash
-minikube addons enable metallb
-kubectl get pods -n metallb-system
-```
-
-**Docker Desktop / Kind:**
-
-Both use the same MetalLB installation:
-
-```bash
+# Install MetalLB with manifest
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
 ```
 
-Create an IPAddressPool for your local network range:
+**Configure IP address pool:**
+
+Create a config map for the IP pool:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: example
   namespace: metallb-system
-spec:
-  addresses:
-  - 192.168.1.240-192.168.1.250
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 192.168.1.240-192.168.1.250
 EOF
 ```
 
-Note: Docker Desktop can expose LoadBalancer Services directly on localhost without MetalLB, and Kind includes limited LoadBalancer support using port-mapping. Install MetalLB only if you want full LoadBalancer functionality with custom IP pools.
+**Test with a LoadBalancer service:**
 
-This addon becomes more interesting when you start experimenting with `Service` objects of type `LoadBalancer`.
-
-### 4.8.12 How to choose what to try next
-
-A good order of experimentation after the core tutorial would be:
-
-1. `dashboard`
-2. `storage-provisioner` and `default-storageclass`
-3. `metallb`
-4. `registry` / `registry-creds`
-5. `volumesnapshots` / `csi-hostpath-driver`
-6. `gvisor`
-7. `logviewer`
-
-That order moves from low-friction visibility and storage features toward more advanced network exposure, runtime, and image-distribution topics.
-
-One practical warning: enabling many addons at once can make a small local cluster harder to reason about. It is usually better to enable one addon, inspect what new Pods and resources appear, experiment with it, and then decide whether to keep it.
-
-### 4.8.13 Docker Desktop: Extending your cluster
-
-Docker Desktop's Kubernetes doesn't have an addon system like Minikube, but you can extend it in similar ways:
-
-**Kubernetes Dashboard:**
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
-kubectl proxy
+kubectl create deployment test-lb --image=nginx:1.27-alpine
+kubectl expose deployment test-lb --port=80 --type=LoadBalancer
+kubectl get svc test-lb
 ```
-Then access at: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
 
-**Additional features:**
-You can install any Kubernetes-compatible application using standard `kubectl apply` commands or Helm charts. This includes monitoring tools (Prometheus, Grafana), logging systems (ELK, Loki), and service meshes (Istio, Linkerd).
+You should see an EXTERNAL-IP assigned from the configured pool.
 
-## 4.9 kubectl config and managing multiple clusters
+**Why this matters:**
+
+MetalLB demonstrates how LoadBalancer services work in cloud environments. Understanding LoadBalancer vs Ingress vs NodePort is important for designing service exposure strategies.
+
+**Clean up:**
+
+```bash
+kubectl delete deployment test-lb
+kubectl delete service test-lb
+kubectl delete -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
+```
+
+---
+
+### 4.8.3 Prometheus + Grafana - Monitoring stack
+
+Prometheus collects metrics, and Grafana visualizes them. This combination is the de facto standard for Kubernetes monitoring.
+
+**What it does:**
+
+- Scrapes metrics from Kubernetes components and applications
+- Stores time-series data for historical analysis
+- Provides pre-built dashboards for cluster health
+- Enables alerting on resource usage
+
+**Install the Prometheus Operator:**
+
+```bash
+# Add the Prometheus Community Helm repository
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# Install the kube-prometheus-stack (includes Prometheus, Grafana, and dashboards)
+helm install kube-prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+```
+
+**Access Grafana:**
+
+Port-forward to access Grafana:
+
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-grafana 3000:80
+```
+
+Open: http://localhost:3000
+
+Default credentials:
+- Username: `admin`
+- Password: run `kubectl get secret -n monitoring kube-prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode`
+
+**Explore dashboards:**
+
+Grafana comes with pre-configured Kubernetes dashboards. Navigate to:
+- Dashboards → Browse → Kubernetes → Compute Resources / Pod
+- Dashboards → Browse → Kubernetes → Networking / Cluster
+- Dashboards → Browse → Kubernetes → Storage / Persistent Volumes
+
+**Why this matters:**
+
+Monitoring is essential for production Kubernetes. This local installation lets you practice with the same tools you'd use in production, helping you understand resource usage patterns and capacity planning.
+
+**Clean up:**
+
+```bash
+helm uninstall kube-prometheus -n monitoring
+kubectl delete namespace monitoring
+```
+
+---
+
+### 4.8.4 cert-manager - Automatic TLS certificates
+
+cert-manager automates the issuance and renewal of TLS certificates, integrating with Let's Encrypt for free HTTPS certificates.
+
+**What it does:**
+
+- Automatically provisions certificates from Let's Encrypt
+- Renews certificates before they expire
+- Integrates with Ingress resources for automatic HTTPS
+- Supports multiple certificate sources (Let's Encrypt, Vault, self-signed)
+
+**Install cert-manager:**
+
+```bash
+# Install cert-manager CRDs
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.crds.yaml
+
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
+```
+
+**Create a self-signed issuer for testing:**
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+EOF
+```
+
+**Test with a certificate:**
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: test-cert
+  namespace: tutorial
+spec:
+  secretName: test-cert-tls
+  dnsNames:
+  - test.example.local
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+EOF
+```
+
+Verify the certificate:
+
+```bash
+kubectl get certificate test-cert -n tutorial
+kubectl describe secret test-cert-tls -n tutorial
+```
+
+**Why this matters:**
+
+TLS certificate management is critical for production services. cert-manager shows how Kubernetes controllers can automate security operations that would otherwise be manual and error-prone.
+
+**Clean up:**
+
+```bash
+kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
+kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.crds.yaml
+```
+
+---
+
+### 4.8.5 Loki - Log aggregation
+
+Loki is a horizontally-scalable log aggregation system inspired by Prometheus. It's designed to be cost-effective and easy to operate.
+
+**What it does:**
+
+- Centralizes logs from all containers
+- Provides full-text search and label-based querying
+- Integrates with Grafana for log visualization
+- Uses less storage than full-text logging solutions
+
+**Install Loki:**
+
+```bash
+# Add Grafana Helm repository
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+
+# Create namespace
+kubectl create namespace loki
+
+# Install Loki and Promtail
+helm install loki grafana/loki-stack --namespace loki --set grafana.enabled=false --set promtail.enabled=true
+```
+
+**Configure Grafana data source:**
+
+Port-forward Grafana (if not already running):
+
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-grafana 3000:80
+```
+
+In Grafana:
+1. Go to Configuration → Data Sources
+2. Add data source → Loki
+3. URL: `http://loki.loki:3100`
+4. Save and test
+
+**View logs:**
+
+Navigate to Explore → Select Loki datasource → Run query
+
+Try these queries:
+- `{namespace="tutorial"}` - All logs from tutorial namespace
+- `{namespace="tutorial", container="api"}` - Specific container logs
+- `{namespace="tutorial"} |= "error"` - Logs containing "error"
+
+**Why this matters:**
+
+Centralized logging is essential for debugging distributed applications. Unlike `kubectl logs`, which shows one pod at a time, Loki lets you query across all pods and correlate events.
+
+**Clean up:**
+
+```bash
+helm uninstall loki -n loki
+kubectl delete namespace loki
+```
+
+---
+
+### 4.8.6 Additional extensions worth exploring
+
+The following extensions are also valuable for Docker Desktop Kubernetes environments:
+
+**Backup and Recovery:**
+- [Velero](https://velero.io/) - Backup and restore cluster resources and persistent volumes
+
+**Resource Management:**
+- [Goldilocks](https://goldilocks.docs.fairwinds.com/) - Analyzes resource usage and provides right-sizing recommendations
+
+**Developer Tools:**
+- [k9s](https://k9scli.io/) - Terminal UI for Kubernetes (faster navigation than kubectl for many tasks)
+- [Kube-shell](https://github.com/kube-shell/kube-shell) - Integrated shell with auto-completion
+
+**Observability:**
+- [Jaeger](https://www.jaegertracing.io/) - Distributed tracing platform
+- [Kube-state-metrics](https://github.com/kubernetes/kube-state-metrics) - Generates cluster resource metrics
+
+**DNS and Networking:**
+- [external-dns](https://github.com/kubernetes-sigs/external-dns) - Automatically create DNS records for Ingress resources
+
+**Security:**
+- [Trivy](https://aquasecurity.github.io/trivy/) - Container vulnerability scanner
+- [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) - Policy as code for Kubernetes
+
+---
 
 Throughout this tutorial, you've used `kubectl` to interact with a single local cluster. As you work with Kubernetes more, you'll likely need to manage multiple clusters: your local development cluster, test clusters, and production environments. The `kubectl config` command is how you manage these connections.
 
@@ -1523,7 +1449,7 @@ kctx() {
   kubectl config use-context $1
 }
 
-# Usage: kctx minikube
+# Usage: kctx docker-desktop
 ```
 
 **View namespace for current context:**
@@ -1586,31 +1512,7 @@ Common issues:
 - Use shell prompts or tools to show your current context (tools like `kube-ps1` or `kubectx` can help)
 - Never commit kubeconfig files with credentials to version control
 
-**Minikube and Kind considerations:**
-
-Minikube and Kind automatically add contexts when you create clusters:
-
-```bash
-# Minikube creates a context named "minikube"
-minikube start
-kubectl config get-contexts  # Shows "minikube" context
-
-# Kind creates contexts prefixed with "kind-"
-kind create cluster --name tutorial
-kubectl config get-contexts  # Shows "kind-tutorial" context
-```
-
-When you delete these clusters, remember to remove their contexts:
-
-```bash
-minikube delete
-kubectl config delete-context minikube
-
-kind delete cluster --name tutorial
-kubectl config delete-context kind-tutorial
-```
-
-## 4.10 Exercise notes and possible solutions
+## 4.9 Managing kubeconfig and contexts
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
@@ -1756,18 +1658,12 @@ kubectl apply -f dashboard-ingress.yaml
 
 Get the ingress controller's NodePort and access the Dashboard:
 
-**Docker Desktop:**
 ```bash
 NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
 curl -H 'Host: dashboard.local' "http://localhost:$NODEPORT/"
 ```
 
-**Minikube:**
-```bash
-MINIKUBE_IP=$(minikube ip)
-NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
-curl -H 'Host: dashboard.local' "http://$MINIKUBE_IP:$NODEPORT/"
-```
+**Note:** Other cluster environments may require different access methods.
 
 Important notes about this solution:
 

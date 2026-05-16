@@ -1188,7 +1188,7 @@ When a PVC is created, Kubernetes tries to bind it to a suitable PV.
 There are two broad ways that can happen:
 
 - **dynamic provisioning**
-  - this is common in environments like minikube or managed cloud clusters
+  - this is common in local development environments or managed cloud clusters
   - a storage provisioner automatically creates backing storage when a PVC is requested
   - this is the most convenient path for tutorials because you do not need to define the PV yourself first
 - **static provisioning**
@@ -1237,7 +1237,7 @@ That `hostPath` pattern is useful for a simple lab, but it is not usually the ri
 - More complex to set up but required for stateful workloads in multi-node clusters
 - Examples: NFS, AWS EBS, Azure Disk, Google Persistent Disk, Ceph, GlusterFS
 
-Your local cluster (Docker Desktop or Minikube) has only one node, so node-local storage works fine for learning. In a production multi-node cluster, database workloads typically use network-backed storage classes so pods can be rescheduled while maintaining data access.
+Your local Docker Desktop cluster has only one node, so node-local storage works fine for learning. In a production multi-node cluster, database workloads typically use network-backed storage classes so pods can be rescheduled while maintaining data access.
 
 Other ways PVs can be backed include:
 
@@ -1361,7 +1361,7 @@ kubectl delete -f config/01-pods/pvc-demo.yaml
 
 If your storage class uses `Delete` reclaim behavior, the backing storage is usually removed automatically when the claim is deleted. In other environments, cleanup behavior can differ.
 
-A PVC is a request, not the storage implementation itself. In minikube, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
+A PVC is a request, not the storage implementation itself. In local development environments, a storage provisioner usually satisfies that request automatically and binds the claim to backing storage for you.
 
 ## 2.20 Understanding the complete Kubernetes object hierarchy
 

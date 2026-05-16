@@ -1,6 +1,6 @@
-# Advanced Topics: Gateway and Gateway API Options for Minikube
+# Advanced Topics: Gateway and Gateway API Options
 
-The main tutorial uses the minikube ingress addon because it is the simplest reliable path for the core lessons. This advanced section is where you compare more capable alternatives.
+The main tutorial uses a standard ingress controller because it is the simplest reliable path for the core lessons. This advanced section is where you compare more capable alternatives.
 
 A useful way to study these options is to keep the same application intent across all of them:
 
@@ -20,7 +20,7 @@ A useful way to study these options is to keep the same application intent acros
 
 ### Limitations
 
-- more installation work than the built-in minikube ingress addon
+- more installation work than the standard ingress controller used in the main tutorial
 - still requires you to install Gateway API CRDs and the gateway controller
 
 ### Example configuration
@@ -207,7 +207,7 @@ spec:
 
 ### Limitations
 
-- very easy for a minikube tutorial to turn into an Istio tutorial by accident
+- very easy for a Kubernetes tutorial to turn into an Istio tutorial by accident
 - significantly more conceptual and operational overhead
 
 ### Example configuration
