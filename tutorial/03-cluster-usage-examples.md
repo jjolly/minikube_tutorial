@@ -91,26 +91,16 @@ Flask API Pod
 
 Build the API image.
 
-**Docker Desktop:**
 ```bash
 cd src/03-genkey-basic
 docker build -t genkey-basic-api:0.1.0 .
 cd ../..
 ```
 
-**Minikube:**
-```bash
-cd src/03-genkey-basic
-minikube image build -t genkey-basic-api:0.1.0 .
-cd ../..
-```
-
 Why this is written as a small sequence:
 
 - first you move into the directory that contains the Docker build context
-- then you build the image
-  - Docker Desktop: images are immediately available to the cluster
-  - Minikube: `minikube image build` builds the image directly into minikube's image store
+- then you build the image (Docker Desktop's Kubernetes makes it immediately available)
 - finally you return to the repository root so later commands match the file paths shown in the tutorial
 
 Apply the Kubernetes manifests:
@@ -189,31 +179,16 @@ nginx frontend Pod  -- /genkey/api -->  Service/genkey-api  -->  Flask API Pod
 
 Build the backend image first.
 
-**Docker Desktop:**
 ```bash
 cd src/04-genkey-full/backend
 docker build -t genkey-api:0.1.0 .
 ```
 
-**Minikube:**
-```bash
-cd src/04-genkey-full/backend
-minikube image build -t genkey-api:0.1.0 .
-```
-
 Then build the frontend image.
 
-**Docker Desktop:**
 ```bash
 cd ..
 docker build -f Dockerfile.frontend -t genkey-web:0.1.0 .
-cd ../..
-```
-
-**Minikube:**
-```bash
-cd ..
-minikube image build -f Dockerfile.frontend -t genkey-web:0.1.0 .
 cd ../..
 ```
 
@@ -292,17 +267,9 @@ This approach is **not optimal** because the API runtime needs broader database 
 
 Build the journal API image.
 
-**Docker Desktop:**
 ```bash
 cd src/05-journal/api
 docker build -t journal-api:0.1.0 .
-cd ../../..
-```
-
-**Minikube:**
-```bash
-cd src/05-journal/api
-minikube image build -t journal-api:0.1.0 .
 cd ../../..
 ```
 
@@ -507,7 +474,6 @@ request: Host=tutorial.local, Path=/genkey/... or /journal/...
 There are many ways to expose Kubernetes applications. In this tutorial, Ingress is the right next step because:
 
 - it matches common Kubernetes usage
-- minikube supports it easily with the ingress addon
 - it cleanly demonstrates path-based routing for both applications
 
 File: `config/05-journal/13-ingress.yaml`
@@ -526,8 +492,6 @@ kubectl get ingress -n tutorial
 
 Get the ingress controller's NodePort.
 
-**Docker Desktop:**
-
 ```bash
 NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
 echo "$NODEPORT"
@@ -540,27 +504,7 @@ $NODEPORT = kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpat
 echo $NODEPORT
 ```
 
-For Docker Desktop, you can access the ingress via `localhost`.
-
-**Minikube:**
-
-```bash
-MINIKUBE_IP=$(minikube ip)
-NODEPORT=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
-echo "$MINIKUBE_IP"
-echo "$NODEPORT"
-```
-
-**PowerShell:**
-
-```powershell
-$MINIKUBE_IP = minikube ip
-$NODEPORT = kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}'
-echo $MINIKUBE_IP
-echo $NODEPORT
-```
-
-For Minikube, you need both the IP and the NodePort.
+Docker Desktop's Kubernetes exposes the ingress controller via `localhost`. Other cluster environments may require different access methods.
 
 Why this is split out:
 
@@ -579,7 +523,6 @@ That is a useful habit in Kubernetes: read the routing rule first, then test whe
 
 Test the routes with the expected host header.
 
-**Docker Desktop:**
 ```bash
 curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/"
 curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/api"
@@ -592,21 +535,6 @@ curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/journal/"
 curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/"
 curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/genkey/api"
 curl -H 'Host: tutorial.local' "http://localhost:$NODEPORT/journal/"
-```
-
-**Minikube:**
-```bash
-curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
-curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"
-curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
-```
-
-**PowerShell:** Use the `$MINIKUBE_IP` and `$NODEPORT` variables you set earlier:
-
-```powershell
-curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/"
-curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/genkey/api"
-curl -H 'Host: tutorial.local' "http://$MINIKUBE_IP:$NODEPORT/journal/"
 ```
 
 This is the final proof that a single ingress entrypoint can route to multiple backend Services by path.
