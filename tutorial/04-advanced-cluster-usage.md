@@ -67,9 +67,7 @@ kubectl delete -f config/05-journal/12-rbac-readonly.yaml
 
 ## 4.3 Managing multiple local clusters
 
-Docker Desktop's Kubernetes runs a single cluster on your local machine. For most learning and development, this is sufficient—you can use namespaces to isolate different projects within the same cluster.
-
-If you need multiple completely separate clusters, other tools like **kind** (Kubernetes in Docker) can run alongside Docker Desktop. Each kind cluster is independent, with its own set of nodes and resources.
+Docker Desktop's Kubernetes runs a single cluster on your local machine. For most learning and development, this is sufficient—you can use namespaces to isolate different projects within the same cluster. Other cluster environments may provide options for running multiple local clusters, though this tutorial focuses on Docker Desktop.
 
 Docker Desktop's Kubernetes makes your built images immediately available to the cluster. Other cluster environments may require different image handling approaches.
 
