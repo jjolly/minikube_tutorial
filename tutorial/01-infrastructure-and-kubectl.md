@@ -478,7 +478,7 @@ Why this matters:
 
 - it helps confirm that your commands are aimed at the cluster you expect
 
-The `kubectl config` command manages kubeconfig files, which store cluster connection information and authentication details. For more on managing multiple clusters and contexts, see **[Part 4, section 4.9: kubectl config and managing multiple clusters](04-advanced-cluster-usage.md#4.9-kubectl-config-and-managing-multiple-clusters)**.
+The `kubectl config` command manages kubeconfig files, which store cluster connection information and authentication details. For more on managing multiple clusters and contexts, see **[Part 5, section 5.9: Managing kubeconfig and contexts](05-advanced-cluster-usage.md#5.9-managing-kubeconfig-and-contexts)**.
 
 Check the main cluster endpoints:
 

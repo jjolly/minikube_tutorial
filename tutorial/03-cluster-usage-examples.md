@@ -566,6 +566,6 @@ You now have a working Ingress controller that routes traffic to `/genkey/*` and
 2. Apply it with `kubectl apply -f dashboard-ingress.yaml`
 3. Access the Dashboard through your Ingress URL instead of `kubectl proxy`
 
-**A solution is provided in [Part 4, section 4.10.6: Dashboard Ingress challenge](04-advanced-cluster-usage.md#4.10.6-dashboard-ingress-challenge).**
+**A solution is provided in [Part 5, section 5.10.6: Dashboard Ingress challenge](05-advanced-cluster-usage.md#5.10.6-dashboard-ingress-challenge).**
 
 ---

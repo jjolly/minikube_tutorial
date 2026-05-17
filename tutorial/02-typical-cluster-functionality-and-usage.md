@@ -412,7 +412,7 @@ Hints:
 
 If you want to try it on your own first, stop here for a moment.
 
-A possible answer appears later in the exercise notes section in **Part 4, section 4.9**, so you can check your work there if needed.
+A possible answer appears later in the exercise notes section in **Part 5, section 5.10**, so you can check your work there if needed.
 
 That little exercise is worth doing because it reinforces that Kubernetes is not doing anything magical yet. At this point, you are still reaching one specific Pod by its IP, just as before.
 
@@ -654,7 +654,7 @@ Why this step is needed here:
 - that lets you test the Service from your browser or with local `curl` without creating an external exposure method such as a NodePort, LoadBalancer, or Ingress
 - this makes `port-forward` a good fit for quick access during a tutorial, but production-oriented systems usually rely on a more durable exposure method such as a load balancer or ingress path instead
 - if you did **not** use `port-forward`, you would usually need to test from inside the cluster with another Pod, or you would need to expose the Service using some other Kubernetes networking method
-- for one example of a production-style exposure method, see **Part 4, section 4.6.3, "AKS example: exposing a Service with `type: LoadBalancer`"**
+- for one example of a production-style exposure method, see **Part 5, section 5.6.3, "AKS example: exposing a Service with `type: LoadBalancer`"**
 
 Important timing note:
 

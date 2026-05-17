@@ -1,10 +1,10 @@
-# Part 4. Advanced cluster usage
+# Part 5. Advanced cluster usage
 
 This part is where the tutorial steps beyond the core walkthrough and shows the reader how to explore, troubleshoot, and extend a Kubernetes lab environment with more confidence. It matters because real understanding does not come only from following the happy path; it also comes from knowing how to diagnose failures, compare environments, experiment with optional features, and recognize where local clusters fit within the larger Kubernetes landscape. The sections here are meant to help the reader grow from someone following examples into someone investigating and experimenting on purpose.
 
-## 4.1 Cluster troubleshooting: what to check and which tools to use
+## 5.1 Cluster troubleshooting: what to check and which tools to use
 
-## 4.2 RBAC
+## 5.2 RBAC
 
 **RBAC** controls who can do what in Kubernetes.
 
@@ -65,133 +65,7 @@ If you do not want to keep this RBAC example, remove it with:
 kubectl delete -f config/05-journal/12-rbac-readonly.yaml
 ```
 
-## 4.3 Managing multiple local clusters
-
-Docker Desktop's Kubernetes runs a single cluster on your local machine. For most learning and development, this is sufficient—you can use namespaces to isolate different projects within the same cluster. Other cluster environments may provide options for running multiple local clusters, though this tutorial focuses on Docker Desktop.
-
-Docker Desktop's Kubernetes makes your built images immediately available to the cluster. Other cluster environments may require different image handling approaches.
-
-## 4.4 Multi-node local clusters
-
-The main tutorial uses a single-node local cluster because that is the clearest starting point. Local clusters can also create multi-node configurations, which provide hands-on experience with scheduling across more than one node.
-
-This is still a local lab. The additional nodes are not separate physical machines in the way they might be in a cloud or data-center environment. But they are still useful because Kubernetes now has more than one node to choose from when placing workloads.
-
-### 4.4.1 Why try a multi-node cluster?
-
-A multi-node local cluster is useful when you want to see:
-
-- that a cluster can have more than one schedulable node
-- that Pods can land on different nodes
-- how labels, scheduling, and placement start to matter more when there is actual choice
-- how `kubectl get nodes` and `kubectl get pods -o wide` become more interesting
-
-This belongs in the advanced part of the tutorial because the main walkthrough does not need multiple nodes. But once the basics are comfortable, multi-node behavior is worth seeing directly.
-
-### 4.4.2 Creating a multi-node cluster
-
-Docker Desktop provides a straightforward way to run a multi-node cluster:
-
-1. Open Docker Desktop Settings
-2. Navigate to **Kubernetes**
-3. Adjust the **Kubernetes nodes** slider to your desired number of nodes (2-3 is a good starting point)
-4. Click **Apply & Restart**
-
-**Important:** Changing the number of Kubernetes nodes resets the cluster. You will need to re-apply essential manifests:
-
-```bash
-# Re-enable ingress (required for later examples)
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
-
-# Re-create the tutorial namespace if needed
-kubectl create namespace tutorial
-
-# Verify your nodes
-kubectl get nodes -o wide
-```
-
-### Clean up
-
-If you want to return to a single-node cluster, use the Docker Desktop Settings → Kubernetes → Kubernetes nodes slider and adjust it back to 1.
-
-### 4.4.3 What to observe once it is running
-
-Useful commands:
-
-```bash
-kubectl get nodes -o wide
-kubectl get pods -A -o wide
-```
-
-What to look for:
-
-- more than one node listed in `kubectl get nodes`
-- system Pods distributed across nodes rather than everything appearing on one machine
-- later, your own application Pods may land on different nodes as well
-
-The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
-
-The `NODE` column becomes much more interesting here. In a single-node cluster, it is almost always the same. In a multi-node cluster, it tells you where Kubernetes actually placed each Pod.
-
-### 4.4.4 A simple way to experience scheduling across nodes
-
-One easy experiment is to create a Deployment with several replicas and then inspect where those replicas landed.
-
-Useful commands:
-
-```bash
-kubectl create deployment hello-multi --image=nginx:1.27-alpine
-kubectl scale deployment hello-multi --replicas=4
-kubectl rollout status deployment/hello-multi
-kubectl get pods -o wide
-```
-
-What to observe:
-
-- Kubernetes may place the replicas across the available nodes
-- the `NODE` column in `kubectl get pods -o wide` tells you where each replica ended up
-- even when the image and template are identical, the scheduler can spread work across nodes instead of packing everything into one place
-
-This is one of the first moments where the abstract idea of "a cluster has multiple nodes" starts to feel concrete.
-
-### Clean up
-
-If you only created the sample Deployment for observation, remove it with:
-
-```bash
-kubectl delete deployment hello-multi
-```
-
-### 4.4.4 Important limitations of this experience
-
-It is still important to keep expectations realistic.
-
-A multi-node local cluster helps you explore:
-
-- scheduling across nodes
-- node-level visibility in `kubectl`
-- some placement and resource behaviors
-
-But it does **not** automatically recreate all the realities of a larger environment. For example:
-
-- the nodes are still part of one local setup
-- local resource bottlenecks still come from the same host machine
-- networking and storage behavior are still shaped by the local environment
-- failure modes are still simpler than many production environments
-
-So the value of this experiment is not "now I have production." The value is "now I can see Kubernetes making placement decisions across multiple nodes."
-
-### Clean up
-
-If you only created the sample Deployment for observation, remove it with:
-
-```bash
-kubectl delete deployment hello-multi
-```
-
-If you are done with the entire multi-node lab, you can return to a single-node configuration using Docker Desktop Settings → Kubernetes → Kubernetes nodes.
-
-## 4.5 Gateway and alternatives to Ingress
+## 5.3 Gateway and alternatives to Ingress
 
 The main tutorial intentionally stays with Ingress. But there are more advanced options worth considering after the core lessons are complete.
 
@@ -206,7 +80,7 @@ Summary of options:
 - **Cilium Gateway API**
 - **Istio Gateway API support**
 
-### 4.5.1 Recommendation
+### 5.3.1 Recommendation
 
 Keep the main tutorial on **Ingress**.
 
@@ -215,13 +89,13 @@ If you later want one advanced Gateway-focused extension, the best first options
 1. **NGINX Gateway Fabric**
 2. **Envoy Gateway**
 
-## 4.6 Local cluster limitations and Kubernetes alternatives
+## 5.4 Local cluster limitations and Kubernetes alternatives
 
 Local Kubernetes clusters are excellent for learning Kubernetes concepts, testing manifests, and experimenting with application behavior on a local machine. But they are still **local development clusters**, not a full substitute for every kind of Kubernetes environment.
 
 That does not make them "fake." They are real Kubernetes. But they are real Kubernetes in a very particular operating context: usually small, local, single-user, and optimized for experimentation.
 
-### 4.6.1 Where local clusters are especially strong
+### 5.4.1 Where local clusters are especially strong
 
 Local clusters are a good fit when you want:
 
@@ -231,7 +105,7 @@ Local clusters are a good fit when you want:
 - one-node cluster behavior that is easy to reason about
 - a low-cost lab without renting cloud infrastructure
 
-### 4.6.2 Important limitations to expect
+### 5.4.2 Important limitations to expect
 
 Local clusters usually differ from larger Kubernetes environments in several ways:
 
@@ -263,7 +137,7 @@ So the main mindset shift is:
 - local clusters teach Kubernetes concepts very well
 - but they do not automatically teach every operational reality of a larger environment
 
-### 4.6.3 Common Kubernetes environment alternatives
+### 5.4.3 Common Kubernetes environment alternatives
 
 The main alternatives you are likely to encounter fall into a few broad categories.
 
@@ -389,7 +263,7 @@ What to expect:
 - the Kubernetes API surface is still broadly familiar
 - installation model, defaults, networking, ingress setup, storage, and operational tooling can differ a lot
 
-### 4.6.4 How to think about the differences
+### 5.4.4 How to think about the differences
 
 A practical comparison is:
 
@@ -401,7 +275,7 @@ A practical comparison is:
 - **self-managed clusters**
   - strong when you want maximum control and are willing to own the operational complexity
 
-### 4.6.5 What usually carries over from local clusters
+### 5.4.5 What usually carries over from local clusters
 
 Even when the surrounding environment changes, many of the core lessons in this tutorial still transfer well:
 
@@ -429,7 +303,7 @@ A useful troubleshooting order is:
 
 The goal of this section is not to turn you into a production SRE in one step. It is to give you a practical toolkit for diagnosing common Kubernetes problems.
 
-### 4.1.1 First checks: cluster status and context
+### 5.1.1 First checks: cluster status and context
 
 Start with the broadest questions first.
 
@@ -462,7 +336,7 @@ If the context appears stale after recreating a cluster:
 kubectl config use-context <context-name>
 ```
 
-### 4.1.2 Inspect the node and system components
+### 5.1.2 Inspect the node and system components
 
 If the cluster exists but still seems unhealthy, check the node and the core supporting Pods.
 
@@ -486,7 +360,7 @@ What to look for:
 
 This is often where addon failures or cluster-level issues first become visible.
 
-### 4.1.3 Diagnose a Pod that did not start correctly
+### 5.1.3 Diagnose a Pod that did not start correctly
 
 If your workload exists but is not healthy, inspect the Pod directly.
 
@@ -518,7 +392,7 @@ A good beginner habit is:
 - use `describe` for Kubernetes' explanation of what happened
 - use `logs` for the application's own output
 
-### 4.1.4 Using ephemeral debugging containers
+### 5.1.4 Using ephemeral debugging containers
 
 Sometimes logs and `describe` output are still not enough. You may want to look at the running Pod from the inside with tools that the original image does not contain.
 
@@ -597,7 +471,7 @@ A good rule of thumb is:
 - use a **temporary debug Pod** when you simply need another client somewhere in the cluster
 - use an **ephemeral container** when you need to inspect the inside of an already running Pod
 
-### 4.1.5 Diagnose Deployment rollout problems
+### 5.1.5 Diagnose Deployment rollout problems
 
 Deployments add another layer because Kubernetes is trying to maintain a desired number of Pods for you.
 
@@ -619,7 +493,7 @@ What these help you answer:
 
 This is especially useful when a Deployment exists but the application still does not seem reachable.
 
-### 4.1.6 Diagnose Service and networking problems
+### 5.1.6 Diagnose Service and networking problems
 
 If the Pods are healthy but traffic is not getting through, shift from workload troubleshooting to networking troubleshooting.
 
@@ -646,7 +520,7 @@ Typical failure patterns:
 - the application is listening on a different port than the Service expects
 - DNS or path assumptions are wrong
 
-### 4.1.7 Diagnose Ingress and HTTP routing problems
+### 5.1.7 Diagnose Ingress and HTTP routing problems
 
 If the Services work but HTTP routing still fails, inspect the ingress layer.
 
@@ -668,7 +542,7 @@ What these help you answer:
 
 A common beginner mistake is assuming an Ingress YAML problem when the real issue is that traffic is reaching the wrong port or host header.
 
-### 4.1.8 Diagnose storage and PVC problems
+### 5.1.8 Diagnose storage and PVC problems
 
 When storage is involved, check both the claim and the workload using it.
 
@@ -690,7 +564,7 @@ What these help you answer:
 
 This matters because sometimes a Pod looks broken when the real failure is that its storage never became available.
 
-### 4.1.9 High-value troubleshooting commands to remember
+### 5.1.9 High-value troubleshooting commands to remember
 
 If you only remember a short list, remember these:
 
@@ -710,7 +584,7 @@ kubectl get events -A --sort-by=.lastTimestamp
 
 These commands cover a surprisingly large percentage of beginner and intermediate cluster problems.
 
-### 4.1.10 Troubleshooting mindset
+### 5.1.10 Troubleshooting mindset
 
 A few habits will save you time:
 
@@ -729,7 +603,7 @@ Reset Kubernetes cluster from Docker Desktop Settings → Kubernetes → Reset K
 
 Sometimes the answer is yes, especially in a learning environment.
 
-## 4.7 Shared storage with an NFS server pod
+## 5.5 Shared storage with an NFS server pod
 
 Earlier in the tutorial, you learned that node-local storage (like `hostPath` PVs) is tied to a specific node. This section demonstrates a practical pattern for working around that limitation: run an NFS server as a pod that serves node-local storage to other pods via the network.
 
@@ -755,7 +629,7 @@ Service/nfs-server (stable endpoint: port 2049)
         +----> Client Pod 2 (mounts NFS share at /data)
 ```
 
-### 4.7.1 Create the node-local PersistentVolume
+### 5.5.1 Create the node-local PersistentVolume
 
 First, create a PV backed by a directory on the node:
 
@@ -790,7 +664,7 @@ Apply the PV:
 kubectl apply -f config/03-nfs-demo/pv-nfs-data.yaml
 ```
 
-### 4.7.2 Create the PersistentVolumeClaim
+### 5.5.2 Create the PersistentVolumeClaim
 
 Now create a PVC that binds to the PV:
 
@@ -823,7 +697,7 @@ NAME          STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS   A
 nfs-data-pvc  Bound    nfs-data-pv    1Gi        RWO                           <seconds>
 ```
 
-### 4.7.3 Deploy the NFS server pod
+### 5.5.3 Deploy the NFS server pod
 
 Now deploy an NFS server that uses the PVC and exports it as an NFS share:
 
@@ -895,7 +769,7 @@ kubectl apply -f config/03-nfs-demo/nfs-server.yaml
 kubectl wait --for=condition=ready pod -l app=nfs-server --timeout=120s
 ```
 
-### 4.7.4 Deploy client pods that use the NFS share
+### 5.5.4 Deploy client pods that use the NFS share
 
 Now create pods that mount and use the NFS share:
 
@@ -977,14 +851,14 @@ This file was written by nfs-client-writer
 Done!
 ```
 
-### 4.7.5 What this demonstrates
+### 5.5.5 What this demonstrates
 
 - **Shared storage**: Multiple pods accessed the same file
 - **Network filesystem**: The NFS protocol allowed remote file access
 - **Service integration**: The NFS server was accessed through a stable Service DNS name
 - **Separation of concerns**: The NFS server pod manages storage independently from client pods
 
-### 4.7.6 Important limitations
+### 5.5.6 Important limitations
 
 - **Single node**: The underlying PV is still node-local via `hostPath`
 - **Node affinity**: The NFS server pod must run on the node where the `/nfs-data` directory exists
@@ -993,7 +867,7 @@ Done!
   - Proper NFS server configuration with authentication and security
   - Readiness probes and health checks for the NFS server
 
-### 4.7.7 Clean up
+### 5.5.7 Clean up
 
 Remove all the resources created in this demonstration:
 
@@ -1011,11 +885,11 @@ If you want to remove the node-local directory as well:
 docker exec -it desktop-worker sh -c "rm -rf /nfs-data"
 ```
 
-## 4.8 Local cluster extensions
+## 5.6 Local cluster extensions
 
 Once you are comfortable with the basics of Pods, Services, Deployments, storage, and ingress, you may want to explore additional cluster features. Docker Desktop's Kubernetes can be extended with standard Kubernetes manifests and Helm charts.
 
-### 4.8.1 Portainer - Visual management interface
+### 5.6.1 Portainer - Visual management interface
 
 Portainer provides a web-based UI for managing both Docker containers and Kubernetes resources. It integrates seamlessly with Docker Desktop.
 
@@ -1067,7 +941,7 @@ kubectl delete namespace portainer
 
 ---
 
-### 4.8.2 MetalLB - LoadBalancer for local clusters
+### 5.6.2 MetalLB - LoadBalancer for local clusters
 
 Local clusters don't have a cloud provider to allocate LoadBalancer IPs. MetalLB solves this by providing a network load-balancer implementation that works with standard Kubernetes LoadBalancer services.
 
@@ -1129,7 +1003,7 @@ kubectl delete -f https://raw.githubusercontent.com/metallb/metallb/main/config/
 
 ---
 
-### 4.8.3 Prometheus + Grafana - Monitoring stack
+### 5.6.3 Prometheus + Grafana - Monitoring stack
 
 Prometheus collects metrics, and Grafana visualizes them. This combination is the de facto standard for Kubernetes monitoring.
 
@@ -1185,7 +1059,7 @@ kubectl delete namespace monitoring
 
 ---
 
-### 4.8.4 cert-manager - Automatic TLS certificates
+### 5.6.4 cert-manager - Automatic TLS certificates
 
 cert-manager automates the issuance and renewal of TLS certificates, integrating with Let's Encrypt for free HTTPS certificates.
 
@@ -1258,7 +1132,7 @@ kubectl delete -f https://github.com/cert-manager/cert-manager/releases/download
 
 ---
 
-### 4.8.5 Loki - Log aggregation
+### 5.6.5 Loki - Log aggregation
 
 Loki is a horizontally-scalable log aggregation system inspired by Prometheus. It's designed to be cost-effective and easy to operate.
 
@@ -1319,7 +1193,7 @@ kubectl delete namespace loki
 
 ---
 
-### 4.8.6 Additional extensions worth exploring
+### 5.6.6 Additional extensions worth exploring
 
 The following extensions are also valuable for Docker Desktop Kubernetes environments:
 
@@ -1510,13 +1384,13 @@ Common issues:
 - Use shell prompts or tools to show your current context (tools like `kube-ps1` or `kubectx` can help)
 - Never commit kubeconfig files with credentials to version control
 
-## 4.9 Managing kubeconfig and contexts
+## 5.7 Managing kubeconfig and contexts
 
 This tutorial includes a few small challenge prompts meant to slow the reader down just enough to think about what Kubernetes is doing.
 
 These are not the only correct ways to reason about the exercises, but they provide useful reference answers if you got stuck.
 
-### 4.10.1 Pod access challenge from section 2.5
+### 5.8.1 Pod access challenge from section 2.5
 
 Question:
 
@@ -1537,7 +1411,7 @@ hello from echo-pod at <pod-ip>
 
 If that worked, you confirmed that `echo-pod` is reachable from inside the cluster the same way the simpler Pod was.
 
-### 4.10.2 Namespace default challenge from section 2.11
+### 5.8.2 Namespace default challenge from section 2.11
 
 Question:
 
@@ -1549,7 +1423,7 @@ Possible explanation:
 - `kubectl get pods -n default` overrides that default and explicitly asks for objects in `default`
 - this is a reminder that the current context can carry a namespace preference, but explicit `-n` flags still win
 
-### 4.10.3 Label selector challenge from section 2.11
+### 5.8.3 Label selector challenge from section 2.11
 
 Question:
 
@@ -1561,7 +1435,7 @@ Possible explanation:
 - that is because the earlier standalone Pod used the `app=echo` label, but not `tier=demo`
 - the `tier=demo` label appears later in the Deployment's Pod template
 
-### 4.10.4 Deployment observation challenge from section 2.13
+### 5.8.4 Deployment observation challenge from section 2.13
 
 Questions:
 
@@ -1599,7 +1473,7 @@ hello from echo-deployment-7d8c6c9f5b-def34
 
 You might not see all replicas in a short run, and the exact sequence can vary. The main lesson is that the responses do not have to come from one fixed Pod.
 
-### 4.10.5 Ingress route prediction challenge from section 3.11
+### 5.8.5 Ingress route prediction challenge from section 3.11
 
 Questions:
 
@@ -1615,7 +1489,7 @@ Possible explanation:
 
 The key lesson is that Ingress routes to Services, and a Service or frontend proxy may then forward deeper into the application.
 
-### 4.10.6 Dashboard Ingress challenge from section 3.11
+### 5.8.6 Dashboard Ingress challenge from section 3.11
 
 Question:
 
@@ -1698,7 +1572,7 @@ Clean up when done:
 kubectl delete -f dashboard-ingress.yaml
 ```
 
-## 4.11 What is already ready for polish later
+## 5.9 What is already ready for polish later
 
 This version is meant to have the right **structure**, **teaching contrasts**, and **object ordering** first.
 
