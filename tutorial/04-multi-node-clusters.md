@@ -51,11 +51,8 @@ After the cluster restarts, you'll need to reinstall some components:
 # Re-enable ingress controller
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 
-# Wait for ingress to be ready
-kubectl wait --namespace ingress-nginx `
-  --for=condition=ready pod `
-  --selector=app.kubernetes.io/component=controller `
-  --timeout=90s
+# Wait for ingress to be ready (may take a minute or two)
+kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
 
 # Re-create the tutorial namespace
 kubectl create namespace tutorial
