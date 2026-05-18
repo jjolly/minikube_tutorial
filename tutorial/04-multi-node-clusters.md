@@ -174,6 +174,84 @@ What you'll see:
 
 This information is what the scheduler uses when deciding where to place new Pods.
 
+### 4.5.1 Adding custom labels to nodes
+
+Beyond the built-in labels, you can add your own labels to nodes. This is useful for creating custom scheduling criteria, such as marking nodes for specific workloads, environments, or hardware characteristics.
+
+Add a custom label to a node:
+
+```bash
+kubectl label node desktop-worker2 workload=fast-storage
+```
+
+Verify the label was added:
+
+```bash
+kubectl get nodes --show-labels | grep desktop-worker2
+kubectl describe node desktop-worker2 | grep -A 10 "Labels:"
+```
+
+You should see the new `workload=fast-storage` label among the node's labels.
+
+**Why this is useful:**
+- Mark nodes for specific types of workloads (databases, web servers, batch jobs)
+- Identify hardware capabilities (SSD vs HDD, GPU availability, network bandwidth)
+- Create environment-based separation (development vs production nodes)
+- Support A/B testing scenarios by routing specific deployments to labeled nodes
+
+### Deploying to nodes with custom labels
+
+Once you've labeled a node, you can target it with `nodeSelector`. Create a Pod that only runs on nodes with your custom label:
+
+```bash
+kubectl apply -f -n tutorial -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fast-storage-pod
+spec:
+  nodeSelector:
+    workload: fast-storage
+  containers:
+  - name: nginx
+    image: nginx:1.27-alpine
+    ports:
+    - containerPort: 80
+EOF
+```
+
+Verify where it was scheduled:
+
+```bash
+kubectl get pods -n tutorial -o wide
+```
+
+The Pod should be running on `desktop-worker2` because it's the only node with the `workload=fast-storage` label.
+
+### Clean up
+
+Remove the Pod:
+
+```bash
+kubectl delete pod fast-storage-pod -n tutorial
+```
+
+Remove the label from the node:
+
+```bash
+kubectl label node desktop-worker2 workload-
+```
+
+The trailing hyphen tells Kubernetes to remove that label. Verify it's gone:
+
+```bash
+kubectl get node desktop-worker2 --show-labels | grep workload
+```
+
+No output means the label has been removed.
+
+**Note:** Labels persist until you remove them. If you forget to clean up custom labels, they may cause unexpected scheduling behavior later. Always clean up labels after experiments.
+
 ## 4.6 Using labels to control Pod placement
 
 Beyond observing where Kubernetes places Pods, you can actively control placement using labels, affinities, and tolerations. This section shows you how to target specific nodes and exclude the control-plane from application workloads.
