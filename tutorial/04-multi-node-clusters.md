@@ -162,8 +162,8 @@ Common node labels you might see:
 ### Viewing node details
 
 ```bash
-kubectl describe node docker-desktop
-kubectl describe node docker-desktop2
+kubectl describe node desktop-control-plane
+kubectl describe node desktop-worker
 ```
 
 What you'll see:
@@ -183,7 +183,7 @@ Beyond observing where Kubernetes places Pods, you can actively control placemen
 Before controlling placement, understand why Pods normally avoid the control-plane node.
 
 ```bash
-kubectl describe node docker-desktop | grep -A 3 "Taints"
+kubectl describe node desktop-control-plane | grep -A 3 "Taints"
 ```
 
 You'll typically see:
@@ -201,7 +201,7 @@ This `NoSchedule` taint means:
 
 The simplest placement control is `nodeSelector`—a key-value pair that must match a node's labels.
 
-Create a Pod that only runs on `docker-desktop2`:
+Create a Pod that only runs on `desktop-worker2`:
 
 ```bash
 kubectl apply -f -n tutorial -f - <<EOF
@@ -211,7 +211,7 @@ metadata:
   name: pinned-pod
 spec:
   nodeSelector:
-    kubernetes.io/hostname: docker-desktop2
+    kubernetes.io/hostname: desktop-worker2
   containers:
   - name: nginx
     image: nginx:1.27-alpine
@@ -226,7 +226,7 @@ Verify where it was scheduled:
 kubectl get pods -n tutorial -o wide
 ```
 
-The `NODE` column shows `docker-desktop2`. Kubernetes placed the Pod there because the `nodeSelector` requires it.
+The `NODE` column shows `desktop-worker2`. Kubernetes placed the Pod there because the `nodeSelector` requires it.
 
 **Why this is useful:**
 - Pinning workloads to nodes with specific hardware (GPUs, SSDs)
@@ -266,7 +266,7 @@ Verify placement:
 kubectl get pods -n tutorial -o wide
 ```
 
-The Pod runs on `docker-desktop` (the control-plane) because the toleration allows it to bypass the NoSchedule taint.
+The Pod runs on `desktop-control-plane` because the toleration allows it to bypass the NoSchedule taint.
 
 **Why this is useful:**
 - System tools that need control-plane access
@@ -326,7 +326,7 @@ Observe where they landed:
 kubectl get pods -n tutorial -o wide -l app=worker-only
 ```
 
-All four Pods should be on worker nodes (`docker-desktop2`, `docker-desktop3`), not on `docker-desktop`.
+All four Pods should be on worker nodes (`desktop-worker`, `desktop-worker2`), not on `desktop-control-plane`.
 
 **How the affinity rule works:**
 - `requiredDuringSchedulingIgnoredDuringExecution` means: "Must match this rule to schedule, but ignore it after scheduling"
@@ -360,11 +360,13 @@ This requires metrics-server, which you should have installed during cluster set
 What you might see:
 
 ```
-NAME             CPU(cores)   MEMORY(bytes)
-docker-desktop   123m         1234567K
-docker-desktop2  89m          987654K
-docker-desktop3  95m          1054321K
+NAME                    CPU(cores)   MEMORY(bytes)
+desktop-control-plane   123m         1234567K
+desktop-worker          89m          987654K
+desktop-worker2         95m          1054321K
 ```
+
+**Note:** Your actual values will differ based on your cluster's workload and resource usage.
 
 ### Create a resource-intensive Deployment
 
