@@ -51,8 +51,17 @@ After the cluster restarts, you'll need to reinstall some components:
 # Re-enable ingress controller
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 
+# Re-enable metrics-server (needed for section 4.7)
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# Patch metrics-server to work with Docker Desktop's self-signed certificates
+kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+
 # Wait for ingress to be ready (may take a minute or two)
 kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
+
+# Wait a moment for metrics-server to start collecting data
+Start-Sleep -Seconds 30
 
 # Re-create the tutorial namespace
 kubectl create namespace tutorial
