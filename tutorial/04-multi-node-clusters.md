@@ -65,16 +65,19 @@ kubectl get nodes -o wide
 ### What you should see
 
 ```
-NAME             STATUS   ROLES           AGE   VERSION
-docker-desktop   Ready    control-plane   1m    v1.x.x.x
-docker-desktop2  Ready    <none>          30s   v1.x.x.x
-docker-desktop3  Ready    <none>          30s   v1.x.x.x
+NAME                    STATUS   ROLES           AGE     VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                         KERNEL-VERSION                      CONTAINER-RUNTIME
+desktop-control-plane   Ready    control-plane   4m4s    v1.34.3   172.18.0.4    <none>        Debian GNU/Linux 12 (bookworm)   6.6.114.1-microsoft-standard-WSL2   containerd://2.2.0
+desktop-worker          Ready    <none>          3m51s   v1.34.3   172.18.0.3    <none>        Debian GNU/Linux 12 (bookworm)   6.6.114.1-microsoft-standard-WSL2   containerd://2.2.0
+desktop-worker2         Ready    <none>          3m50s   v1.34.3   172.18.0.2    <none>        Debian GNU/Linux 12 (bookworm)   6.6.114.1-microsoft-standard-WSL2   containerd://2.2.0
 ```
+
+**Note:** Your output will differ. Node names, ages, IP addresses, and version numbers will vary depending on your Docker Desktop version and when you created the cluster.
 
 Key observations:
 - Multiple nodes are listed
-- One node has the `control-plane` role
-- The other nodes are worker nodes
+- One node (`desktop-control-plane`) has the `control-plane` role
+- The other nodes (`desktop-worker`, `desktop-worker2`) are worker nodes
+- The `-o wide` flag shows additional information including internal IPs, OS image, kernel version, and container runtime
 
 ## 4.3 Observing system Pods across nodes
 
@@ -113,16 +116,19 @@ kubectl get pods -n tutorial -o wide
 What you might see:
 
 ```
-NAME                          READY   STATUS    NODE
-hello-multi-7f6d9f8c9-abc12   1/1     Running   docker-desktop
-hello-multi-7f6d9f8c9-def34   1/1     Running   docker-desktop2
-hello-multi-7f6d9f8c9-ghi56   1/1     Running   docker-desktop3
-hello-multi-7f6d9f8c9-jkl78   1/1     Running   docker-desktop2
+NAME                          READY   STATUS    RESTARTS   AGE     IP           NODE              NOMINATED NODE   READINESS GATES
+hello-multi-8bd4df9c4-dlz6w   1/1     Running   0          63s     10.244.2.5   desktop-worker2   <none>           <none>
+hello-multi-8bd4df9c4-fqwtx   1/1     Running   0          63s     10.244.1.4   desktop-worker    <none>           <none>
+hello-multi-8bd4df9c4-ghpns   1/1     Running   0          63s     10.244.1.3   desktop-worker    <none>           <none>
+hello-multi-8bd4df9c4-l7wrz   1/1     Running   0          2m53s   10.244.2.4   desktop-worker2   <none>           <none>
 ```
+
+**Note:** Your output will differ. Pod names, IP addresses, ages, and exact node distribution will vary. The important pattern to observe is that Pods are distributed across multiple worker nodes.
 
 Key observations:
 - Kubernetes distributed replicas across available nodes
-- Two replicas might land on the same node—that's normal scheduling behavior
+- Two replicas are on `desktop-worker2` and two on `desktop-worker`
+- No replicas landed on `desktop-control-plane` due to its control-plane taint
 - The scheduler aims for reasonable distribution, not perfect spread
 
 ### Why this matters
