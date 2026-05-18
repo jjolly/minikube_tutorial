@@ -316,9 +316,13 @@ The `NODE` column shows `desktop-worker2`. Kubernetes placed the Pod there becau
 kubectl delete pod pinned-pod -n tutorial
 ```
 
-### 4.6.3 Allowing a Pod on the control-plane with tolerations
+### 4.6.3 Pinning a Pod to the control-plane
 
-To run a Pod on the control-plane node, you must add a toleration that matches the taint.
+To run a Pod on the control-plane node, you need two things:
+1. A toleration that allows it to bypass the NoSchedule taint
+2. A nodeSelector that specifically targets the control-plane node
+
+A toleration alone only *allows* scheduling on the tainted node—it doesn't *force* the Pod there. The scheduler will still choose from all eligible nodes based on resource availability and other factors.
 
 ```powershell
 @'
@@ -327,6 +331,8 @@ kind: Pod
 metadata:
   name: control-plane-pod
 spec:
+  nodeSelector:
+    kubernetes.io/hostname: desktop-control-plane
   tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists
@@ -343,11 +349,11 @@ Verify placement:
 kubectl get pods -n tutorial -o wide
 ```
 
-The Pod runs on `desktop-control-plane` because the toleration allows it to bypass the NoSchedule taint.
+The Pod now runs on `desktop-control-plane` because the `nodeSelector` forces it there, and the toleration allows it to bypass the NoSchedule taint.
 
 **Why this is useful:**
-- System tools that need control-plane access
-- Monitoring agents that must run near the API server
+- System tools that must run on the control-plane
+- Monitoring agents that need to run near the API server
 - Testing and debugging in development environments
 
 ### Clean up
