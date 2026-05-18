@@ -2,6 +2,8 @@
 
 This part explores what happens when your local cluster has more than one node. It matters because the main tutorial uses a single-node cluster, which is the clearest starting point but doesn't show you how Kubernetes makes decisions about where to place workloads when it has multiple nodes to choose from.
 
+**Note:** All command examples in this part use PowerShell syntax. If you're using Bash or Zsh, you'll need to adjust the syntax accordingly—particularly for multi-line YAML commands where PowerShell uses here-strings (`@'...'@`) instead of bash heredocs.
+
 ## 4.1 Why try a multi-node cluster?
 
 The main tutorial demonstrates all the core Kubernetes concepts with just one node. That works because Pods, Deployments, Services, ConfigMaps, Secrets, and PersistentVolumeClaims all behave the same way whether there's one node or ten.
@@ -45,14 +47,14 @@ This is a **destructive operation**. Your existing cluster, including all deploy
 
 After the cluster restarts, you'll need to reinstall some components:
 
-```bash
+```powershell
 # Re-enable ingress controller
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 
 # Wait for ingress to be ready
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
+kubectl wait --namespace ingress-nginx `
+  --for=condition=ready pod `
+  --selector=app.kubernetes.io/component=controller `
   --timeout=90s
 
 # Re-create the tutorial namespace
@@ -83,7 +85,7 @@ Key observations:
 
 Once you have multiple nodes, look at how system Pods are distributed:
 
-```bash
+```powershell
 kubectl get pods -A -o wide
 ```
 
@@ -101,7 +103,7 @@ One of the clearest ways to see scheduling in action is to create a Deployment w
 
 ### Create a test Deployment
 
-```bash
+```powershell
 kubectl create deployment hello-multi --image=nginx:1.27-alpine -n tutorial
 kubectl scale deployment hello-multi --replicas=4 -n tutorial
 kubectl rollout status deployment/hello-multi -n tutorial
@@ -109,7 +111,7 @@ kubectl rollout status deployment/hello-multi -n tutorial
 
 ### Observe Pod placement
 
-```bash
+```powershell
 kubectl get pods -n tutorial -o wide
 ```
 
@@ -141,7 +143,7 @@ In a single-node cluster, the NODE column is boring—every Pod lands on the sam
 
 ### Clean up the experiment
 
-```bash
+```powershell
 kubectl delete deployment hello-multi -n tutorial
 ```
 
@@ -149,7 +151,7 @@ kubectl delete deployment hello-multi -n tutorial
 
 Kubernetes uses labels extensively for scheduling decisions. You can see the labels on your nodes:
 
-```bash
+```powershell
 kubectl get nodes --show-labels
 ```
 
@@ -161,7 +163,7 @@ Common node labels you might see:
 
 ### Viewing node details
 
-```bash
+```powershell
 kubectl describe node desktop-control-plane
 kubectl describe node desktop-worker
 ```
@@ -180,15 +182,15 @@ Beyond the built-in labels, you can add your own labels to nodes. This is useful
 
 Add a custom label to a node:
 
-```bash
+```powershell
 kubectl label node desktop-worker2 workload=fast-storage
 ```
 
 Verify the label was added:
 
-```bash
-kubectl get nodes --show-labels | grep desktop-worker2
-kubectl describe node desktop-worker2 | grep -A 10 "Labels:"
+```powershell
+kubectl get nodes --show-labels | Select-String "desktop-worker2"
+kubectl describe node desktop-worker2 | Select-String -Pattern "Labels:" -Context 0,10
 ```
 
 You should see the new `workload=fast-storage` label among the node's labels.
@@ -203,8 +205,8 @@ You should see the new `workload=fast-storage` label among the node's labels.
 
 Once you've labeled a node, you can target it with `nodeSelector`. Create a Pod that only runs on nodes with your custom label:
 
-```bash
-kubectl apply -f -n tutorial -f - <<EOF
+```powershell
+@'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -217,12 +219,12 @@ spec:
     image: nginx:1.27-alpine
     ports:
     - containerPort: 80
-EOF
+'@ | kubectl apply -n tutorial -f -
 ```
 
 Verify where it was scheduled:
 
-```bash
+```powershell
 kubectl get pods -n tutorial -o wide
 ```
 
@@ -232,20 +234,20 @@ The Pod should be running on `desktop-worker2` because it's the only node with t
 
 Remove the Pod:
 
-```bash
+```powershell
 kubectl delete pod fast-storage-pod -n tutorial
 ```
 
 Remove the label from the node:
 
-```bash
+```powershell
 kubectl label node desktop-worker2 workload-
 ```
 
 The trailing hyphen tells Kubernetes to remove that label. Verify it's gone:
 
-```bash
-kubectl get node desktop-worker2 --show-labels | grep workload
+```powershell
+kubectl get node desktop-worker2 --show-labels | Select-String "workload"
 ```
 
 No output means the label has been removed.
@@ -260,8 +262,8 @@ Beyond observing where Kubernetes places Pods, you can actively control placemen
 
 Before controlling placement, understand why Pods normally avoid the control-plane node.
 
-```bash
-kubectl describe node desktop-control-plane | grep -A 3 "Taints"
+```powershell
+kubectl describe node desktop-control-plane | Select-String -Pattern "Taints:" -Context 0,3
 ```
 
 You'll typically see:
@@ -281,8 +283,8 @@ The simplest placement control is `nodeSelector`—a key-value pair that must ma
 
 Create a Pod that only runs on `desktop-worker2`:
 
-```bash
-kubectl apply -f -n tutorial -f - <<EOF
+```powershell
+@'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -295,12 +297,12 @@ spec:
     image: nginx:1.27-alpine
     ports:
     - containerPort: 80
-EOF
+'@ | kubectl apply -n tutorial -f -
 ```
 
 Verify where it was scheduled:
 
-```bash
+```powershell
 kubectl get pods -n tutorial -o wide
 ```
 
@@ -313,7 +315,7 @@ The `NODE` column shows `desktop-worker2`. Kubernetes placed the Pod there becau
 
 ### Clean up
 
-```bash
+```powershell
 kubectl delete pod pinned-pod -n tutorial
 ```
 
@@ -321,8 +323,8 @@ kubectl delete pod pinned-pod -n tutorial
 
 To run a Pod on the control-plane node, you must add a toleration that matches the taint.
 
-```bash
-kubectl apply -f -n tutorial -f - <<EOF
+```powershell
+@'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -335,12 +337,12 @@ spec:
   containers:
   - name: nginx
     image: nginx:1.27-alpine
-EOF
+'@ | kubectl apply -n tutorial -f -
 ```
 
 Verify placement:
 
-```bash
+```powershell
 kubectl get pods -n tutorial -o wide
 ```
 
@@ -353,7 +355,7 @@ The Pod runs on `desktop-control-plane` because the toleration allows it to bypa
 
 ### Clean up
 
-```bash
+```powershell
 kubectl delete pod control-plane-pod -n tutorial
 ```
 
@@ -361,8 +363,8 @@ kubectl delete pod control-plane-pod -n tutorial
 
 A common production pattern: applications run on worker nodes, never on the control-plane. Use `nodeAffinity` to exclude the control-plane.
 
-```bash
-kubectl apply -f -n tutorial -f - <<EOF
+```powershell
+@'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -389,18 +391,18 @@ spec:
         image: nginx:1.27-alpine
         ports:
         - containerPort: 80
-EOF
+'@ | kubectl apply -n tutorial -f -
 ```
 
 Wait for the Pods to be ready:
 
-```bash
+```powershell
 kubectl rollout status deployment/worker-only -n tutorial
 ```
 
 Observe where they landed:
 
-```bash
+```powershell
 kubectl get pods -n tutorial -o wide -l app=worker-only
 ```
 
@@ -419,7 +421,7 @@ All four Pods should be on worker nodes (`desktop-worker`, `desktop-worker2`), n
 
 ### Clean up
 
-```bash
+```powershell
 kubectl delete deployment worker-only -n tutorial
 ```
 
@@ -429,7 +431,7 @@ When nodes have different amounts of available resources, Kubernetes considers t
 
 ### Check node resource usage
 
-```bash
+```powershell
 kubectl top nodes
 ```
 
@@ -450,7 +452,7 @@ desktop-worker2         95m          1054321K
 
 You can see resource-aware scheduling by creating Pods with specific resource requests:
 
-```bash
+```powershell
 kubectl create deployment resource-test --image=nginx:1.27-alpine -n tutorial
 kubectl set resources deployment/resource-test --requests=cpu=100m,memory=128Mi -n tutorial
 kubectl scale deployment resource-test --replicas=6 -n tutorial
@@ -461,7 +463,7 @@ Kubernetes will consider each node's available CPU and memory when placing these
 
 ### Clean up
 
-```bash
+```powershell
 kubectl delete deployment resource-test -n tutorial
 ```
 
